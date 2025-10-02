@@ -1,0 +1,93 @@
+
+{
+  "dressTheModel_mainTitle": "Dress The Model",
+  "dressTheModel_subtitle": "Upload model and clothing photos to start",
+  "dressTheModel_uploaderCaptionModel": "Upload model photo",
+  "dressTheModel_uploaderDescriptionModel": "Portrait or full-body, clear face",
+  "dressTheModel_uploaderCaptionClothing": "Upload clothing photo",
+  "dressTheModel_uploaderDescriptionClothing": "Clear, front-facing product shot",
+  "dressTheModel_modelCaption": "Model",
+  "dressTheModel_clothingCaption": "Clothing",
+  "dressTheModel_backgroundLabel": "Background",
+  "dressTheModel_backgroundPlaceholder": "Search or enter background...",
+  "dressTheModel_poseLabel": "Pose",
+  "dressTheModel_posePlaceholder": "Search or enter pose...",
+  "dressTheModel_styleLabel": "Photo Style",
+  "dressTheModel_stylePlaceholder": "Search or enter style...",
+  "dressTheModel_notesPlaceholder": "e.g., add a necklace, night lighting...",
+  "dressTheModel_creating": "Trying on...",
+  "dressTheModel_createButton": "Try On",
+  "dressTheModel_regenPlaceholder": "e.g., change the hairstyle, add a handbag...",
+  "dressTheModel_qualitySectionTitle": "Quality Mode",
+  "dressTheModel_qualityStandardTab": "Standard",
+  "dressTheModel_qualityAdvancedTab": "Advanced Quality",
+  "dressTheModel_qualityDescription": "These options may increase generation time but will improve quality.",
+  "dressTheModel_standardQualityDescription": "Standard quality is applied automatically to balance speed and efficiency.",
+  "dressTheModel_upscaleLabel": "Upscale Resolution",
+  "dressTheModel_denoiseLabel": "Denoise",
+  "dressTheModel_sharpenLabel": "Sharpen",
+  "dressTheModel_faceRestoreLabel": "Face Restore",
+  "dressTheModel_naturalEnhancement_title": "Natural Image Enhancement",
+  "dressTheModel_naturalEnhancement_off": "Off",
+  "dressTheModel_naturalEnhancement_automatic": "Automatic",
+  "dressTheModel_naturalEnhancement_custom": "Custom",
+  "dressTheModel_naturalEnhancement_refCaption": "Reference Photo {0}",
+  "dressTheModel_naturalEnhancement_refDescription": "Upload a reference photo for the AI to learn skin tone and lighting from.",
+  "dressTheModel_qualityLevels": ["Off", "Low", "Medium", "High"],
+  "dressTheModel_upscaleOptions": ["None", "2x", "4x"],
+  "dressTheModel_backgroundOptions": ["Auto", "Keep original background", "Studio (solid color, gray, white)", "Paris street", "Tokyo street at night", "New York street", "Nature (beach, forest, mountains)", "Luxury interior (hotel, villa)", "Event (red carpet, runway)", "Artistic background (abstract, gradient)", "Cozy coffee shop", "Ancient library", "Royal garden", "City rooftop at sunset", "Graffiti alley", "Inside an art museum", "Fairy tale castle", "Bustling local market", "Lavender field", "Luxury marina", "Classic train station", "Industrial loft"],
+  "dressTheModel_poseOptions": ["Auto", "Keep original pose", "Standing straight (professional, lookbook)", "High-fashion pose (dramatic, artistic)", "Sitting (on a chair, stairs, sofa)", "Walking (natural, strolling on the street)", "In motion (spinning, dancing)", "Leaning against a wall", "Looking over the shoulder", "Hands in pockets", "Legs crossed", "Bending over", "Lying on the floor/grass", "Running/Jumping", "Action pose", "Interacting with accessories (holding a bag, wearing a hat)", "Yoga/meditation pose", "Radiant smile", "Thoughtful expression", "Hand on hip", "Raising hands to the sky"],
+  "dressTheModel_photoStyleOptions": [
+    "Auto",
+    {
+      "group": "Professional Styles",
+      "options": [
+        "Magazine cover (Vogue, Harper's Bazaar)",
+        "Lookbook product shot",
+        "Close-up portrait",
+        "Street style"
+      ]
+    },
+    {
+      "group": "Photographic Techniques",
+      "options": [
+        "Cinematic",
+        "Candid",
+        "35mm film grain",
+        "Polaroid",
+        "Classic black and white",
+        "High-key (bright, low shadow)",
+        "Low-key (dark, high contrast)",
+        "Double exposure",
+        "Motion blur",
+        "Light leaks"
+      ]
+    },
+    {
+      "group": "Angles & Lenses",
+      "options": [
+        "Dutch angle",
+        "Fisheye lens",
+        "Low-angle shot",
+        "Bird's eye view"
+      ]
+    },
+    {
+      "group": "Artistic & Creative",
+      "options": [
+        "Lomography style (vibrant colors, vignette)",
+        "Surreal portrait"
+      ]
+    },
+    {
+      "group": "Camera Color Simulation",
+      "options": [
+        "Leica M11 Camera Color (Depth, Unique)",
+        "Fujifilm GFX 100 II Camera Color (Film Look)",
+        "EOS R5 Mark II Camera Color (Natural & Skin Tones)",
+        "Nikon Z9 Camera Color (Landscape, Sports)",
+        "Alpha A7R V Camera Color (Modern & Refined)"
+      ]
+    }
+  ]
+}

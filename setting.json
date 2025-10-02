@@ -1,0 +1,101 @@
+
+{
+  "enableImageMetadata": false,
+  "home": {
+    "mainTitleKey": "home_mainTitle",
+    "subtitleKey": "home_subtitle",
+    "useSmartTitleWrapping": false,
+    "smartTitleWrapWords": 2
+  },
+  "apps": [
+    {
+      "id": "dress-the-model",
+      "titleKey": "app_dress-the-model_title",
+      "descriptionKey": "app_dress-the-model_description",
+      "icon": "👗",
+      "supportsCanvasPreset": true
+    },
+    {
+      "id": "pattern-designer",
+      "titleKey": "app_pattern-designer_title",
+      "descriptionKey": "app_pattern-designer_description",
+      "icon": "🎨",
+      "supportsCanvasPreset": true
+    },
+    {
+      "id": "replace-product-in-scene",
+      "titleKey": "app_replace-product-in-scene_title",
+      "descriptionKey": "app_replace-product-in-scene_description",
+      "icon": "🛍️",
+      "supportsCanvasPreset": true
+    },
+    {
+      "id": "free-generation",
+      "titleKey": "app_free-generation_title",
+      "descriptionKey": "app_free-generation_description",
+      "icon": "🚀",
+      "supportsCanvasPreset": true
+    },
+    {
+      "id": "image-interpolation",
+      "titleKey": "app_image-interpolation_title",
+      "descriptionKey": "app_image-interpolation_description",
+      "icon": "⚗️",
+      "supportsCanvasPreset": true
+    }
+  ],
+  "dressTheModel": {
+    "mainTitleKey": "dressTheModel_mainTitle",
+    "subtitleKey": "dressTheModel_subtitle",
+    "useSmartTitleWrapping": true,
+    "smartTitleWrapWords": 2,
+    "uploaderCaptionModelKey": "dressTheModel_uploaderCaptionModel",
+    "uploaderDescriptionModelKey": "dressTheModel_uploaderDescriptionModel",
+    "uploaderCaptionClothingKey": "dressTheModel_uploaderCaptionClothing",
+    "uploaderDescriptionClothingKey": "dressTheModel_uploaderDescriptionClothing"
+  },
+  "freeGeneration": {
+    "mainTitleKey": "freeGeneration_mainTitle",
+    "subtitleKey": "freeGeneration_subtitle",
+    "useSmartTitleWrapping": true,
+    "smartTitleWrapWords": 2,
+    "uploaderCaption1Key": "freeGeneration_uploaderCaption1",
+    "uploaderDescription1Key": "freeGeneration_uploaderDescription1",
+    "uploaderCaption2Key": "freeGeneration_uploaderCaption2",
+    "uploaderDescription2Key": "freeGeneration_uploaderDescription2"
+  },
+  "imageInterpolation": {
+    "mainTitleKey": "imageInterpolation_mainTitle",
+    "subtitleKey": "imageInterpolation_subtitle",
+    "useSmartTitleWrapping": true,
+    "smartTitleWrapWords": 3,
+    "uploaderCaptionInputKey": "imageInterpolation_uploaderCaptionInput",
+    "uploaderDescriptionInputKey": "imageInterpolation_uploaderDescriptionInput",
+    "uploaderCaptionOutputKey": "imageInterpolation_uploaderCaptionOutput",
+    "uploaderDescriptionOutputKey": "imageInterpolation_uploaderDescriptionOutput",
+    "uploaderCaptionReferenceKey": "imageInterpolation_uploaderCaptionReference",
+    "uploaderDescriptionReferenceKey": "imageInterpolation_uploaderDescriptionReference"
+  },
+  "patternDesigner": {
+    "mainTitleKey": "patternDesigner_mainTitle",
+    "subtitleKey": "patternDesigner_subtitle",
+    "useSmartTitleWrapping": true,
+    "smartTitleWrapWords": 2,
+    "uploaderCaptionClothingKey": "patternDesigner_uploaderCaptionClothing",
+    "uploaderDescriptionClothingKey": "patternDesigner_uploaderDescriptionClothing",
+    "uploaderCaptionPattern1Key": "patternDesigner_uploaderCaptionPattern1",
+    "uploaderDescriptionPattern1Key": "patternDesigner_uploaderDescriptionPattern1",
+    "uploaderCaptionPattern2Key": "patternDesigner_uploaderCaptionPattern2",
+    "uploaderDescriptionPattern2Key": "patternDesigner_uploaderDescriptionPattern2"
+  },
+  "replaceProductInScene": {
+    "mainTitleKey": "replaceProductInScene_mainTitle",
+    "subtitleKey": "replaceProductInScene_subtitle",
+    "useSmartTitleWrapping": true,
+    "smartTitleWrapWords": 3,
+    "uploaderCaptionProductKey": "replaceProductInScene_uploaderCaptionProduct",
+    "uploaderDescriptionProductKey": "replaceProductInScene_uploaderDescriptionProduct",
+    "uploaderCaptionSceneKey": "replaceProductInScene_uploaderCaptionScene",
+    "uploaderDescriptionSceneKey": "replaceProductInScene_uploaderDescriptionScene"
+  }
+}

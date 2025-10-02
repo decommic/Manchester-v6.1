@@ -1,0 +1,521 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+*/
+
+// Base types
+export interface ImageForZip {
+    url: string;
+    filename: string;
+    folder?: string;
+    extension?: string;
+}
+
+export interface VideoTask {
+    status: 'pending' | 'done' | 'error';
+    resultUrl?: string;
+    error?: string;
+    operation?: any;
+}
+
+export interface AppConfig {
+    id: string;
+    titleKey: string;
+    descriptionKey: string;
+    icon: string;
+    supportsCanvasPreset?: boolean;
+}
+
+export interface AppSettings {
+    mainTitleKey: string;
+    subtitleKey: string;
+    useSmartTitleWrapping: boolean;
+    smartTitleWrapWords: number;
+    [key: string]: any;
+}
+  
+export interface Settings {
+    home: {
+        mainTitleKey: string;
+        subtitleKey: string;
+        useSmartTitleWrapping: boolean;
+        smartTitleWrapWords: number;
+    };
+    apps: AppConfig[];
+    enableImageMetadata: boolean;
+    architectureIdeator: AppSettings;
+    avatarCreator: AppSettings & { minIdeas: number; maxIdeas: number; };
+    babyPhotoCreator: AppSettings & { minIdeas: number; maxIdeas: number; };
+    dressTheModel: AppSettings;
+    photoRestoration: AppSettings;
+    imageToReal: AppSettings;
+    swapStyle: AppSettings;
+    mixStyle: AppSettings;
+    freeGeneration: AppSettings;
+    toyModelCreator: AppSettings;
+    imageInterpolation: AppSettings;
+    patternDesigner: AppSettings;
+    replaceProductInScene: AppSettings;
+}
+
+export type Theme = 'vietnam' | 'black-night';
+export const THEMES: Theme[] = ['vietnam', 'black-night'];
+
+export interface ThemeInfo {
+    id: Theme;
+    name: string;
+    colors: [string, string]; // [startColor, endColor] for gradient
+}
+
+export const THEME_DETAILS: ThemeInfo[] = [
+    { id: 'vietnam', name: 'Việt Nam', colors: ['#DA251D', '#a21a14'] },
+    { id: 'black-night', name: 'Black Night', colors: ['#3d3d3d', '#090a0f'] }
+];
+
+
+export interface ImageToEdit {
+    url: string | null;
+    onSave: (newUrl: string) => void;
+}
+
+
+// --- Centralized State Definitions ---
+
+export type HomeState = { stage: 'home' };
+
+type ImageStatus = 'pending' | 'done' | 'error';
+
+// FIX: Add missing state type definitions
+export interface ArchitectureIdeatorState {
+    stage: 'idle' | 'configuring' | 'generating' | 'results';
+    uploadedImage: string | null;
+    generatedImage: string | null;
+    historicalImages: string[];
+    options: {
+        context: string;
+        style: string;
+        color: string;
+        lighting: string;
+        notes: string;
+        removeWatermark: boolean;
+    };
+    error: string | null;
+}
+
+interface GeneratedAvatarImage {
+    status: ImageStatus;
+    url?: string;
+    error?: string;
+}
+interface HistoricalAvatarImage {
+    idea: string;
+    url: string;
+}
+export interface AvatarCreatorState {
+    stage: 'idle' | 'configuring' | 'generating' | 'results';
+    uploadedImage: string | null;
+    generatedImages: Record<string, GeneratedAvatarImage>;
+    historicalImages: HistoricalAvatarImage[];
+    selectedIdeas: string[];
+    options: {
+        additionalPrompt: string;
+        removeWatermark: boolean;
+        aspectRatio: string;
+    };
+    error: string | null;
+}
+
+export interface BabyPhotoCreatorState {
+    stage: 'idle' | 'configuring' | 'generating' | 'results';
+    uploadedImage: string | null;
+    generatedImages: Record<string, GeneratedAvatarImage>;
+    historicalImages: HistoricalAvatarImage[];
+    selectedIdeas: string[];
+    options: {
+        additionalPrompt: string;
+        removeWatermark: boolean;
+        aspectRatio: string;
+    };
+    error: string | null;
+}
+
+export interface DressTheModelState {
+    stage: 'idle' | 'configuring' | 'generating' | 'results';
+    modelImage: string | null;
+    clothingImage: string | null;
+    referenceImage: string | null; 
+    generatedImage: string | null;
+    historicalImages: string[];
+    options: {
+        background: string;
+        pose: string;
+        style: string;
+        aspectRatio: string;
+        notes: string;
+        removeWatermark: boolean;
+        naturalEnhancementMode: 'off' | 'automatic' | 'custom';
+        naturalEnhancementRefs: (string | null)[];
+        faceRestore: boolean;
+        upscale: string;
+        denoise: string;
+        sharpen: string;
+    };
+    error: string | null;
+}
+
+export interface PhotoRestorationState {
+    stage: 'idle' | 'configuring' | 'generating' | 'results';
+    uploadedImage: string | null;
+    generatedImage: string | null;
+    historicalImages: string[];
+    options: {
+        type: string;
+        gender: string;
+        age: string;
+        nationality: string;
+        notes: string;
+        removeWatermark: boolean;
+        removeStains: boolean;
+    };
+    error: string | null;
+}
+
+export interface ImageToRealState {
+    stage: 'idle' | 'configuring' | 'generating' | 'results';
+    uploadedImage: string | null;
+    generatedImage: string | null;
+    historicalImages: string[];
+    options: {
+        faithfulness: string;
+        notes: string;
+        removeWatermark: boolean;
+    };
+    error: string | null;
+}
+
+export interface SwapStyleState {
+    stage: 'idle' | 'configuring' | 'generating' | 'results';
+    uploadedImage: string | null;
+    generatedImage: string | null;
+    historicalImages: string[];
+    options: {
+        style: string;
+        styleStrength: string;
+        notes: string;
+        removeWatermark: boolean;
+    };
+    error: string | null;
+}
+
+export interface MixStyleState {
+    stage: 'idle' | 'configuring' | 'generating' | 'results';
+    contentImage: string | null;
+    styleImage: string | null;
+    generatedImage: string | null;
+    historicalImages: string[];
+    options: {
+        styleStrength: string;
+        notes: string;
+        removeWatermark: boolean;
+    };
+    finalPrompt: string | null;
+    error: string | null;
+}
+
+export interface ToyModelCreatorState {
+    stage: 'idle' | 'configuring' | 'generating' | 'results';
+    uploadedImage: string | null;
+    generatedImage: string | null;
+    historicalImages: string[];
+    concept: string; // e.g., 'desktop_model', 'keychain', 'gachapon', 'miniature'
+    options: {
+        // Concept 1: Desktop Model
+        computerType: string;
+        softwareType: string;
+        boxType: string;
+        background: string;
+        // Concept 2: Keychain
+        keychainMaterial: string;
+        keychainStyle: string;
+        accompanyingItems: string;
+        deskSurface: string;
+        // Concept 3: Gachapon
+        capsuleColor: string;
+        modelFinish: string;
+        capsuleContents: string;
+        displayLocation: string;
+        // Concept 4: Miniature
+        miniatureMaterial: string;
+        baseMaterial: string;
+        baseShape: string;
+        lightingStyle: string;
+        // Concept 5: Pokémon Model
+        pokeballType: string;
+        evolutionDisplay: string;
+        modelStyle: string;
+        // Concept 6: Crafting Model
+        modelType: string;
+        blueprintType: string;
+        characterMood: string;
+        // Constant Options
+        aspectRatio: string;
+        notes: string;
+        removeWatermark: boolean;
+    };
+    error: string | null;
+}
+
+export interface PatternDesignerState {
+    stage: 'idle' | 'configuring' | 'generating' | 'results';
+    clothingImage: string | null;
+    patternImage1: string | null;
+    patternImage2: string | null;
+    generatedImage: string | null;
+    historicalImages: string[];
+    options: {
+        applicationMode: string;
+        patternScale: string;
+        aspectRatio: string;
+        colorChange: {
+            notes: string;
+            color1: string;
+            color2: string;
+            color3: string;
+            color4: string;
+        };
+        productType: string;
+        notes: string;
+        tshirt: {
+            bodyColor: string;
+            leftSleeveColor: string;
+            rightSleeveColor: string;
+            collarColor: string;
+            hemColor: string;
+            printStyle: string;
+            printSize: string;
+            printNotes: string;
+            fit: string;
+            fabric: string;
+        };
+    };
+    error: string | null;
+}
+
+export interface ReplaceProductInSceneState {
+    stage: 'idle' | 'configuring' | 'generating' | 'results';
+    productImage: string | null;
+    sceneImage: string | null;
+    generatedImage: string | null;
+    historicalImages: string[];
+    decoImage1?: string | null;
+    decoImage2?: string | null;
+    decoImage3?: string | null;
+    decoImage4?: string | null;
+    decoImage5?: string | null;
+    referenceImage?: string | null;
+    options: {
+        layout: string;
+        sceneStyle: string;
+        shootingStyle: string;
+        productDescription: string;
+        sceneDescription: string;
+        sceneAction: string;
+        productScale: string;
+        productShadow: string;
+        decoNotes: string;
+        aspectRatio: string;
+        lightingCategory: string; // 'natural' | 'studio' | 'style'
+        naturalLight: string;
+        studioLight: string;
+        styleLight: string;
+        syncLighting: boolean;
+    };
+    error: string | null;
+}
+
+export interface FreeGenerationState {
+    stage: 'configuring' | 'generating' | 'results';
+    image1: string | null;
+    image2: string | null;
+    generatedImages: string[];
+    historicalImages: string[];
+    options: {
+        prompt: string;
+        removeWatermark: boolean;
+        numberOfImages: number;
+        aspectRatio: string;
+    };
+    error: string | null;
+}
+
+export interface ImageInterpolationState {
+    stage: 'idle' | 'prompting' | 'configuring' | 'generating' | 'results';
+    analysisMode: 'general' | 'deep' | 'expert';
+    inputImage: string | null;
+    outputImage: string | null;
+    referenceImage: string | null;
+    generatedPrompt: string;
+    promptSuggestions: string;
+    additionalNotes: string;
+    finalPrompt: string | null;
+    generatedImage: string | null;
+    historicalImages: { url: string; prompt: string; }[];
+    options: {
+        removeWatermark: boolean;
+        aspectRatio: string;
+    };
+    error: string | null;
+}
+
+// Union type for all possible app states
+export type AnyAppState =
+  | HomeState
+  | ArchitectureIdeatorState
+  | AvatarCreatorState
+  | BabyPhotoCreatorState
+  | DressTheModelState
+  | PhotoRestorationState
+  | ImageToRealState
+  | SwapStyleState
+  | MixStyleState
+  | FreeGenerationState
+  | ToyModelCreatorState
+  | ImageInterpolationState
+  | PatternDesignerState
+  | ReplaceProductInSceneState;
+
+// --- App Navigation & State Types (Moved from App.tsx) ---
+export type HomeView = { viewId: 'home'; state: HomeState };
+export type ArchitectureIdeatorView = { viewId: 'architecture-ideator'; state: ArchitectureIdeatorState };
+export type AvatarCreatorView = { viewId: 'avatar-creator'; state: AvatarCreatorState };
+export type BabyPhotoCreatorView = { viewId: 'baby-photo-creator'; state: BabyPhotoCreatorState };
+export type DressTheModelView = { viewId: 'dress-the-model'; state: DressTheModelState };
+export type PhotoRestorationView = { viewId: 'photo-restoration'; state: PhotoRestorationState };
+export type ImageToRealView = { viewId: 'image-to-real'; state: ImageToRealState };
+export type SwapStyleView = { viewId: 'swap-style'; state: SwapStyleState };
+export type MixStyleView = { viewId: 'mix-style'; state: MixStyleState };
+export type FreeGenerationView = { viewId: 'free-generation'; state: FreeGenerationState };
+export type ToyModelCreatorView = { viewId: 'toy-model-creator'; state: ToyModelCreatorState };
+export type ImageInterpolationView = { viewId: 'image-interpolation'; state: ImageInterpolationState };
+export type PatternDesignerView = { viewId: 'pattern-designer'; state: PatternDesignerState };
+export type ReplaceProductInSceneView = { viewId: 'replace-product-in-scene'; state: ReplaceProductInSceneState };
+
+
+export type ViewState =
+  | HomeView
+  | ArchitectureIdeatorView
+  | AvatarCreatorView
+  | BabyPhotoCreatorView
+  | DressTheModelView
+  | PhotoRestorationView
+  | ImageToRealView
+  | SwapStyleView
+  | MixStyleView
+  | FreeGenerationView
+  | ToyModelCreatorView
+  | ImageInterpolationView
+  | PatternDesignerView
+  | ReplaceProductInSceneView;
+
+// Helper function to get initial state for an app
+export const getInitialStateForApp = (viewId: string): AnyAppState => {
+    switch (viewId) {
+        case 'home':
+            return { stage: 'home' };
+        case 'architecture-ideator':
+            return { stage: 'idle', uploadedImage: null, generatedImage: null, historicalImages: [], options: { context: '', style: '', color: '', lighting: '', notes: '', removeWatermark: false }, error: null };
+        case 'avatar-creator':
+            return { stage: 'idle', uploadedImage: null, generatedImages: {}, historicalImages: [], selectedIdeas: [], options: { additionalPrompt: '', removeWatermark: false, aspectRatio: 'Giữ nguyên' }, error: null };
+        case 'baby-photo-creator':
+            return { stage: 'idle', uploadedImage: null, generatedImages: {}, historicalImages: [], selectedIdeas: [], options: { additionalPrompt: '', removeWatermark: false, aspectRatio: 'Giữ nguyên' }, error: null };
+        case 'dress-the-model':
+            return { stage: 'idle', modelImage: null, clothingImage: null, referenceImage: null, generatedImage: null, historicalImages: [], options: { background: '', pose: '', style: '', aspectRatio: 'Giữ nguyên', notes: '', removeWatermark: false, naturalEnhancementMode: 'automatic', naturalEnhancementRefs: [null, null, null, null], faceRestore: true, upscale: 'Không', denoise: 'Tắt', sharpen: 'Tắt' }, error: null };
+        case 'photo-restoration':
+            return { stage: 'idle', uploadedImage: null, generatedImage: null, historicalImages: [], options: { type: 'Chân dung', gender: 'Tự động', age: '', nationality: '', notes: '', removeWatermark: false, removeStains: true }, error: null };
+        case 'image-to-real':
+            return { stage: 'idle', uploadedImage: null, generatedImage: null, historicalImages: [], options: { faithfulness: 'Tự động', notes: '', removeWatermark: false }, error: null };
+        case 'swap-style':
+            return { stage: 'idle', uploadedImage: null, generatedImage: null, historicalImages: [], options: { style: '', styleStrength: 'Rất mạnh', notes: '', removeWatermark: false }, error: null };
+        case 'mix-style':
+            return { stage: 'idle', contentImage: null, styleImage: null, generatedImage: null, historicalImages: [], options: { styleStrength: 'Rất mạnh', notes: '', removeWatermark: false }, finalPrompt: null, error: null };
+        case 'free-generation':
+            return { stage: 'configuring', image1: null, image2: null, generatedImages: [], historicalImages: [], options: { prompt: '', removeWatermark: false, numberOfImages: 1, aspectRatio: 'Giữ nguyên' }, error: null };
+        case 'toy-model-creator':
+            return { 
+                stage: 'idle', 
+                uploadedImage: null, 
+                generatedImage: null, 
+                historicalImages: [],
+                concept: 'desktop_model', 
+                options: { 
+                    computerType: '', 
+                    softwareType: '', 
+                    boxType: '', 
+                    background: '',
+                    keychainMaterial: '',
+                    keychainStyle: '',
+                    accompanyingItems: '',
+                    deskSurface: '',
+                    capsuleColor: '',
+                    modelFinish: '',
+                    capsuleContents: '',
+                    displayLocation: '',
+                    miniatureMaterial: '',
+                    baseMaterial: '',
+                    baseShape: '',
+                    lightingStyle: '',
+                    pokeballType: '',
+                    evolutionDisplay: '',
+                    modelStyle: '',
+                    modelType: '',
+                    blueprintType: '',
+                    characterMood: '',
+                    aspectRatio: 'Giữ nguyên', 
+                    notes: '', 
+                    removeWatermark: false 
+                }, 
+                error: null 
+            };
+        case 'image-interpolation':
+             return { stage: 'idle', analysisMode: 'general', inputImage: null, outputImage: null, referenceImage: null, generatedPrompt: '', promptSuggestions: '', additionalNotes: '', finalPrompt: null, generatedImage: null, historicalImages: [], options: { removeWatermark: false, aspectRatio: 'Giữ nguyên' }, error: null };
+        case 'pattern-designer':
+            return {
+                stage: 'idle', clothingImage: null, patternImage1: null, patternImage2: null, generatedImage: null, historicalImages: [],
+                options: {
+                    applicationMode: 'Tự động', patternScale: 'Trung bình', aspectRatio: 'Giữ nguyên',
+                    colorChange: { notes: '', color1: '', color2: '', color3: '', color4: '' },
+                    productType: 'Tự động', notes: '',
+                    tshirt: { bodyColor: '', leftSleeveColor: '', rightSleeveColor: '', collarColor: '', hemColor: '', printStyle: '', printSize: '', printNotes: '', fit: '', fabric: '' }
+                }, error: null
+            };
+        case 'replace-product-in-scene':
+            return { 
+                stage: 'idle', productImage: null, sceneImage: null, generatedImage: null, historicalImages: [],
+                decoImage1: null, decoImage2: null, decoImage3: null, decoImage4: null, decoImage5: null,
+                referenceImage: null,
+                options: { 
+                    layout: '', sceneStyle: 'Hòa trộn', shootingStyle: '', productDescription: '',
+                    sceneDescription: '', sceneAction: 'Xóa sản phẩm trong bối cảnh', productScale: '', productShadow: '',
+                    decoNotes: '', aspectRatio: 'Giữ nguyên', lightingCategory: 'natural', naturalLight: '',
+                    studioLight: '', styleLight: '', syncLighting: true
+                }, 
+                error: null 
+            };
+        default:
+            // This will now cover all other non-main apps
+            return { stage: 'home' };
+    }
+};
+
+// --- History Entry Type ---
+export interface GenerationHistoryEntry {
+    id: string;
+    timestamp: number;
+    appId: string;
+    appName: string;
+    thumbnailUrl: string;
+    settings: {
+        viewId: string;
+        state: AnyAppState;
+    };
+}

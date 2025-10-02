@@ -1,0 +1,18 @@
+
+{
+  "home_mainTitle": "Version Premium",
+  "home_subtitle": "Thứ miễn phí trên đời chỉ có nước mưa và ...",
+  "home_uploadJson": "Tải lên JSON",
+  "home_openCanvas": "Canvas",
+  "home_openEditor": "Image Editor",
+  "app_free-generation_title": "Tạo ảnh tự do",
+  "app_free-generation_description": "Tạo ảnh mới từ văn bản hoặc chỉnh sửa ảnh tải lên bằng prompt của riêng bạn.",
+  "app_image-interpolation_title": "Nội suy hình ảnh",
+  "app_image-interpolation_description": "Phân tích cặp ảnh để tạo prompt, sau đó áp dụng prompt đó cho một ảnh tham chiếu.",
+  "app_dress-the-model_title": "Mặc trang phục cho mẫu",
+  "app_dress-the-model_description": "Thử trang phục mới cho người mẫu từ ảnh của bạn, giữ nguyên khuôn mặt và vóc dáng.",
+  "app_pattern-designer_title": "Thiết kế sản phẩm",
+  "app_pattern-designer_description": "Áp dụng họa tiết hoặc kết cấu từ một ảnh lên trang phục trong một ảnh khác.",
+  "app_replace-product-in-scene_title": "Thay nền sản phẩm",
+  "app_replace-product-in-scene_description": "Tự động ghép sản phẩm vào một bối cảnh mới, với khả năng xóa vật thể và hòa trộn thông minh."
+}

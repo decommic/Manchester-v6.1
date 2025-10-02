@@ -1,0 +1,18 @@
+
+{
+  "home_mainTitle": "Version Premium",
+  "home_subtitle": "The only free things in life are rain and...",
+  "home_uploadJson": "Upload JSON",
+  "home_openCanvas": "Canvas",
+  "home_openEditor": "Image Editor",
+  "app_free-generation_title": "Free Generation",
+  "app_free-generation_description": "Create new images from text or edit uploaded photos with your own prompts.",
+  "app_image-interpolation_title": "Image Interpolation",
+  "app_image-interpolation_description": "Analyze an image pair to create a prompt, then apply that prompt to a reference image.",
+  "app_dress-the-model_title": "Dress The Model",
+  "app_dress-the-model_description": "Try new outfits on a model from your photo, keeping their face and figure.",
+  "app_pattern-designer_title": "Product Design",
+  "app_pattern-designer_description": "Apply a pattern or texture from one image to clothing in another.",
+  "app_replace-product-in-scene_title": "Replace Product Background",
+  "app_replace-product-in-scene_description": "Automatically place a product into a new scene, with smart object removal and blending."
+}
