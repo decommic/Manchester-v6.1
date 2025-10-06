@@ -22,7 +22,6 @@ import {
     SearchableSelect,
     useAppControls,
     embedJsonInPng,
-    GalleryPicker,
 } from './uiUtils';
 import { CheckIcon, CloseIcon, InfoIcon } from './icons';
 
@@ -147,14 +146,12 @@ const DressTheModel: React.FC<DressTheModelProps> = (props) => {
         ...headerProps
     } = props;
     
-    const { t, settings, imageGallery } = useAppControls();
+    const { t, settings } = useAppControls();
     const { lightboxIndex, openLightbox, closeLightbox, navigateLightbox } = useLightbox();
     const { videoTasks, generateVideo } = useVideoGeneration();
     const isMobile = useMediaQuery('(max-width: 768px)');
     const [localNotes, setLocalNotes] = useState(appState.options.notes);
     const [isGuideModalOpen, setGuideModalOpen] = useState(false);
-    const [isModelGalleryOpen, setModelGalleryOpen] = useState(false);
-    const [isClothingGalleryOpen, setClothingGalleryOpen] = useState(false);
 
 
     useEffect(() => {
@@ -174,7 +171,7 @@ const DressTheModel: React.FC<DressTheModelProps> = (props) => {
                 ...appState,
                 stage: appState.clothingImage ? 'configuring' : 'idle',
                 modelImage: imageDataUrl,
-                generatedImage: null,
+                generatedImages: [],
                 historicalImages: [],
                 error: null,
             });
@@ -188,7 +185,7 @@ const DressTheModel: React.FC<DressTheModelProps> = (props) => {
                 ...appState,
                 stage: appState.modelImage ? 'configuring' : 'idle',
                 clothingImage: imageDataUrl,
-                generatedImage: null,
+                generatedImages: [],
                 historicalImages: [],
                 error: null,
             });
@@ -212,9 +209,11 @@ const DressTheModel: React.FC<DressTheModelProps> = (props) => {
         });
         addImagesToGallery([newUrl]);
     };
-    const handleGeneratedImageChange = (newUrl: string) => {
+    const handleGeneratedImageChange = (index: number) => (newUrl: string) => {
+        const newGenerated = [...appState.generatedImages];
+        newGenerated[index] = { ...newGenerated[index], url: newUrl, status: 'done' };
         const newHistorical = [...appState.historicalImages, newUrl];
-        onStateChange({ ...appState, stage: 'results', generatedImage: newUrl, historicalImages: newHistorical });
+        onStateChange({ ...appState, stage: 'results', generatedImages: newGenerated, historicalImages: newHistorical });
         addImagesToGallery([newUrl]);
     };
 
@@ -232,48 +231,147 @@ const DressTheModel: React.FC<DressTheModelProps> = (props) => {
         onStateChange({ ...appState, referenceImage: url });
     };
 
-    const executeInitialGeneration = async () => {
+    const executeSingleGeneration = async () => {
         if (!appState.modelImage || !appState.clothingImage) return;
         const preGenState = { ...appState };
-        onStateChange({ ...appState, stage: 'generating', error: null });
+        
+        const singlePrompt = { caption: t('common_result'), pose: 'Tự động' };
+
+        onStateChange({
+            ...appState,
+            stage: 'generating',
+            error: null,
+            generatedImages: [{ caption: singlePrompt.caption, status: 'pending' }],
+        });
+
         try {
             const resultUrl = await generateDressedModelImage(
-                appState.modelImage, 
-                appState.clothingImage, 
-                appState.options,
+                appState.modelImage!, 
+                appState.clothingImage!, 
+                { ...appState.options, pose: singlePrompt.pose },
                 appState.referenceImage
             );
             const settingsToEmbed = {
                 viewId: 'dress-the-model',
-                state: { ...appState, stage: 'configuring', generatedImage: null, historicalImages: [], error: null },
+                state: { ...preGenState, stage: 'configuring', generatedImages: [], historicalImages: [], error: null },
             };
             const urlWithMetadata = await embedJsonInPng(resultUrl, settingsToEmbed, settings.enableImageMetadata);
+            
             logGeneration('dress-the-model', preGenState, urlWithMetadata);
-            onStateChange({ ...appState, stage: 'results', generatedImage: urlWithMetadata, historicalImages: [...appState.historicalImages, urlWithMetadata] });
             addImagesToGallery([urlWithMetadata]);
+
+            onStateChange({
+                ...appState,
+                stage: 'results',
+                generatedImages: [{ caption: singlePrompt.caption, url: urlWithMetadata, status: 'done' }],
+                historicalImages: [...appState.historicalImages, urlWithMetadata],
+            });
+
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
-            onStateChange({ ...appState, stage: 'results', error: errorMessage });
+            onStateChange({
+                ...appState,
+                stage: 'results',
+                error: null,
+                generatedImages: [{ caption: singlePrompt.caption, error: errorMessage, status: 'error' }],
+            });
         }
     };
-    
-    const handleRegeneration = async (prompt: string) => {
-        if (!appState.generatedImage) return;
+
+    const executeMultiAngleGeneration = async () => {
+        if (!appState.modelImage || !appState.clothingImage) return;
         const preGenState = { ...appState };
-        onStateChange({ ...appState, stage: 'generating', error: null });
+        
+        const consistencyInstruction = "YÊU CẦU CỰC KỲ QUAN TRỌNG KHI TẠO NHIỀU GÓC: Đây là một phần của một bộ ảnh. Tất cả các ảnh trong bộ này PHẢI có cùng một người mẫu (giữ nguyên 100% khuôn mặt và kiểu tóc), cùng một bối cảnh, và cùng một kiểu ánh sáng. Chỉ thay đổi tư thế theo yêu cầu.";
+        const combinedNotes = [appState.options.notes, consistencyInstruction].filter(Boolean).join('\n');
+
+        const anglePrompts = [
+            { caption: 'Chụp chính diện', pose: 'Đứng thẳng, chụp chính diện' },
+            { caption: 'Chụp góc nghiêng 3/4', pose: 'Tư thế đứng, chụp góc nghiêng 3/4' },
+            { caption: 'Nhìn qua vai', pose: 'Tư thế đang di chuyển, nhìn qua vai' },
+            { caption: 'Chụp từ phía sau', pose: 'Chụp từ phía sau lưng' },
+        ];
+
+        onStateChange({
+            ...appState,
+            stage: 'generating',
+            error: null,
+            generatedImages: anglePrompts.map(p => ({ caption: p.caption, status: 'pending' })),
+        });
+
+        const generationPromises = anglePrompts.map(async ({ caption, pose }) => {
+            try {
+                const resultUrl = await generateDressedModelImage(
+                    appState.modelImage!, 
+                    appState.clothingImage!, 
+                    { 
+                        ...appState.options, 
+                        pose,
+                        notes: combinedNotes, // Override notes with consistency instruction
+                    },
+                    appState.referenceImage
+                );
+                const settingsToEmbed = {
+                    viewId: 'dress-the-model',
+                    state: { ...preGenState, stage: 'configuring', generatedImages: [], historicalImages: [], error: null },
+                };
+                const urlWithMetadata = await embedJsonInPng(resultUrl, settingsToEmbed, settings.enableImageMetadata);
+                return { caption, url: urlWithMetadata, status: 'done' as 'done' };
+            } catch (err) {
+                const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
+                return { caption, error: errorMessage, status: 'error' as 'error' };
+            }
+        });
+        
+        const results = await Promise.all(generationPromises);
+        
+        const successfulResults = results.filter(r => r.status === 'done' && r.url);
+        if (successfulResults.length > 0) {
+            logGeneration('dress-the-model', preGenState, successfulResults[0].url!);
+            addImagesToGallery(successfulResults.map(r => r.url!));
+        }
+
+        onStateChange({
+            ...appState,
+            stage: 'results',
+            generatedImages: results,
+            historicalImages: [...appState.historicalImages, ...successfulResults.map(r => r.url!)],
+        });
+    };
+    
+    const handleRegeneration = async (index: number, prompt: string, aspectRatio: string) => {
+        const imageToRegen = appState.generatedImages[index];
+        if (!imageToRegen || !imageToRegen.url) return;
+
+        const preGenState = { ...appState };
+        const newGenerated = [...appState.generatedImages];
+        newGenerated[index] = { ...newGenerated[index], status: 'pending' };
+        onStateChange({ ...appState, stage: 'generating', generatedImages: newGenerated });
+
         try {
-            const resultUrl = await editImageWithPrompt(appState.generatedImage, prompt);
+            const resultUrl = await editImageWithPrompt(imageToRegen.url, prompt, aspectRatio, appState.options.removeWatermark);
             const settingsToEmbed = {
                 viewId: 'dress-the-model',
-                state: { ...appState, stage: 'configuring', generatedImage: null, historicalImages: [], error: null },
+                state: { ...appState, stage: 'configuring', generatedImages: [], historicalImages: [], error: null },
             };
             const urlWithMetadata = await embedJsonInPng(resultUrl, settingsToEmbed, settings.enableImageMetadata);
             logGeneration('dress-the-model', preGenState, urlWithMetadata);
-            onStateChange({ ...appState, stage: 'results', generatedImage: urlWithMetadata, historicalImages: [...appState.historicalImages, urlWithMetadata] });
+
+            const finalGenerated = [...appState.generatedImages];
+            finalGenerated[index] = { ...finalGenerated[index], status: 'done', url: urlWithMetadata };
+            
+            onStateChange({
+                ...appState,
+                stage: 'results',
+                generatedImages: finalGenerated,
+                historicalImages: [...appState.historicalImages, urlWithMetadata]
+            });
             addImagesToGallery([urlWithMetadata]);
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
-            onStateChange({ ...appState, stage: 'results', error: errorMessage });
+            const finalGenerated = [...appState.generatedImages];
+            finalGenerated[index] = { ...finalGenerated[index], status: 'error', error: errorMessage };
+            onStateChange({ ...appState, stage: 'results', generatedImages: finalGenerated });
         }
     };
     
@@ -299,7 +397,7 @@ const DressTheModel: React.FC<DressTheModelProps> = (props) => {
         });
     };
 
-    const Uploader = ({ id, onUpload, caption, description, currentImage, onImageChange, onSelectFromGallery, placeholderType, cardType }: any) => (
+    const Uploader = ({ id, onUpload, caption, description, currentImage, onImageChange, placeholderType, cardType }: any) => (
         <div className="flex flex-col items-center gap-4">
             <ActionablePolaroidCard
                 type={currentImage ? cardType : 'uploader'}
@@ -309,7 +407,6 @@ const DressTheModel: React.FC<DressTheModelProps> = (props) => {
                 placeholderType={placeholderType}
                 onClick={currentImage ? () => openLightbox(lightboxImages.indexOf(currentImage)) : undefined}
                 onImageChange={onImageChange}
-                onSelectFromGallery={onSelectFromGallery}
             />
             {description && <p className="base-font font-bold text-neutral-300 text-center max-w-xs text-md">{description}</p>}
         </div>
@@ -331,8 +428,8 @@ const DressTheModel: React.FC<DressTheModelProps> = (props) => {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5 }}
                     >
-                        <Uploader id="model-upload" onUpload={handleModelImageUpload} onImageChange={handleModelImageChange} onSelectFromGallery={() => setModelGalleryOpen(true)} caption={uploaderCaptionModel} description={uploaderDescriptionModel} currentImage={appState.modelImage} placeholderType="person" cardType="photo-input" />
-                        <Uploader id="clothing-upload" onUpload={handleClothingImageUpload} onImageChange={handleClothingImageChange} onSelectFromGallery={() => setClothingGalleryOpen(true)} caption={uploaderCaptionClothing} description={uploaderDescriptionClothing} currentImage={appState.clothingImage} placeholderType="clothing" cardType="clothing-input" />
+                        <Uploader id="model-upload" onUpload={handleModelImageUpload} onImageChange={handleModelImageChange} caption={uploaderCaptionModel} description={uploaderDescriptionModel} currentImage={appState.modelImage} placeholderType="person" cardType="photo-input" />
+                        <Uploader id="clothing-upload" onUpload={handleClothingImageUpload} onImageChange={handleClothingImageChange} caption={uploaderCaptionClothing} description={uploaderDescriptionClothing} currentImage={appState.clothingImage} placeholderType="clothing" cardType="clothing-input" />
                     </motion.div>
                 </div>
             )}
@@ -346,8 +443,8 @@ const DressTheModel: React.FC<DressTheModelProps> = (props) => {
                 >
                     <div className="w-full overflow-x-auto pb-4">
                         <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-8 w-full md:w-max mx-auto px-4">
-                            <ActionablePolaroidCard type="photo-input" mediaUrl={appState.modelImage} caption={t('dressTheModel_modelCaption')} status="done" onClick={() => appState.modelImage && openLightbox(lightboxImages.indexOf(appState.modelImage))} onImageChange={handleModelImageChange} onSelectFromGallery={() => setModelGalleryOpen(true)} />
-                            <ActionablePolaroidCard type="clothing-input" mediaUrl={appState.clothingImage} caption={t('dressTheModel_clothingCaption')} status="done" onClick={() => appState.clothingImage && openLightbox(lightboxImages.indexOf(appState.clothingImage))} onImageChange={handleClothingImageChange} onSelectFromGallery={() => setClothingGalleryOpen(true)} />
+                            <ActionablePolaroidCard type="photo-input" mediaUrl={appState.modelImage} caption={t('dressTheModel_modelCaption')} status="done" onClick={() => appState.modelImage && openLightbox(lightboxImages.indexOf(appState.modelImage))} onImageChange={handleModelImageChange} />
+                            <ActionablePolaroidCard type="clothing-input" mediaUrl={appState.clothingImage} caption={t('dressTheModel_clothingCaption')} status="done" onClick={() => appState.clothingImage && openLightbox(lightboxImages.indexOf(appState.clothingImage))} onImageChange={handleClothingImageChange} />
                         </div>
                     </div>
 
@@ -356,7 +453,6 @@ const DressTheModel: React.FC<DressTheModelProps> = (props) => {
                             <h2 className="base-font font-bold text-2xl text-yellow-400 border-b border-yellow-400/20 pb-2">{t('common_options')}</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <SearchableSelect id="background" label={t('dressTheModel_backgroundLabel')} options={BACKGROUND_OPTIONS} value={appState.options.background} onChange={(value) => handleOptionChange('background', value)} placeholder={t('dressTheModel_backgroundPlaceholder')} />
-                                <SearchableSelect id="pose" label={t('dressTheModel_poseLabel')} options={POSE_OPTIONS} value={appState.options.pose} onChange={(value) => handleOptionChange('pose', value)} placeholder={t('dressTheModel_posePlaceholder')} />
                                 <SearchableSelect id="style" label={t('dressTheModel_styleLabel')} options={PHOTO_STYLE_OPTIONS} value={appState.options.style} onChange={(value) => handleOptionChange('style', value)} placeholder={t('dressTheModel_stylePlaceholder')} />
                                 <div>
                                     <label htmlFor="aspect-ratio-dress" className="block text-left base-font font-bold text-lg text-neutral-200 mb-2">{t('common_aspectRatio')}</label>
@@ -456,7 +552,8 @@ const DressTheModel: React.FC<DressTheModelProps> = (props) => {
                             </div>
                             <div className="flex items-center justify-end gap-4 pt-4">
                                 <button onClick={onReset} className="btn btn-secondary">{t('common_changeImage')}</button>
-                                <button onClick={executeInitialGeneration} className="btn btn-primary" disabled={isLoading}>{isLoading ? t('dressTheModel_creating') : t('dressTheModel_createButton')}</button>
+                                <button onClick={executeSingleGeneration} className="btn btn-secondary" disabled={isLoading}>{isLoading ? t('dressTheModel_creating') : t('dressTheModel_createButton')}</button>
+                                <button onClick={executeMultiAngleGeneration} className="btn btn-primary" disabled={isLoading}>{isLoading ? t('dressTheModel_creating') : 'Tạo ảnh nhiều góc'}</button>
                             </div>
                         </OptionsPanel>
                     </div>
@@ -466,7 +563,7 @@ const DressTheModel: React.FC<DressTheModelProps> = (props) => {
             {(appState.stage === 'generating' || appState.stage === 'results') && (
                 <ResultsView stage={appState.stage} originalImage={appState.modelImage} onOriginalClick={() => appState.modelImage && openLightbox(lightboxImages.indexOf(appState.modelImage))} error={appState.error} isMobile={isMobile} actions={
                     <>
-                        {appState.generatedImage && !appState.error && (<button onClick={handleDownloadAll} className="btn btn-secondary">{t('common_downloadAll')}</button>)}
+                        {appState.generatedImages.some(img => img.status === 'done') && !appState.error && (<button onClick={handleDownloadAll} className="btn btn-secondary">{t('common_downloadAll')}</button>)}
                         <button onClick={handleBackToOptions} className="btn btn-secondary">{t('common_editOptions')}</button>
                         <button onClick={onReset} className="btn btn-secondary">{t('common_startOver')}</button>
                     </>
@@ -476,22 +573,25 @@ const DressTheModel: React.FC<DressTheModelProps> = (props) => {
                             <ActionablePolaroidCard type="clothing-input" caption={t('dressTheModel_clothingCaption')} status="done" mediaUrl={appState.clothingImage} isMobile={isMobile} onClick={() => appState.clothingImage && openLightbox(lightboxImages.indexOf(appState.clothingImage))} onImageChange={handleClothingImageChange} />
                         </motion.div>
                     )}
-                    <motion.div className="w-full md:w-auto flex-shrink-0" key="generated-dress" initial={{ opacity: 0, scale: 0.5, y: 100 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 80, damping: 15, delay: 0.2 }} whileHover={{ scale: 1.05, zIndex: 10 }}>
-                        <ActionablePolaroidCard
-                            type="output"
-                            caption={t('common_result')}
-                            status={isLoading ? 'pending' : (appState.error ? 'error' : 'done')}
-                            mediaUrl={appState.generatedImage ?? undefined} error={appState.error ?? undefined}
-                            onImageChange={handleGeneratedImageChange}
-                            onRegenerate={handleRegeneration}
-                            onGenerateVideoFromPrompt={(prompt) => appState.generatedImage && generateVideo(appState.generatedImage, prompt)}
-                            regenerationTitle={t('common_regenTitle')}
-                            regenerationDescription={t('common_regenDescription')}
-                            regenerationPlaceholder={t('dressTheModel_regenPlaceholder')}
-                            onClick={!appState.error && appState.generatedImage ? () => openLightbox(lightboxImages.indexOf(appState.generatedImage!)) : undefined}
-                            isMobile={isMobile}
-                        />
-                    </motion.div>
+                    {appState.generatedImages.map((image, index) => (
+                        <motion.div className="w-full md:w-auto flex-shrink-0" key={image.caption + index} initial={{ opacity: 0, scale: 0.5, y: 100 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 80, damping: 15, delay: 0.2 + index * 0.1 }}>
+                            <ActionablePolaroidCard
+                                type="output"
+                                caption={image.caption}
+                                status={image.status}
+                                mediaUrl={image.url}
+                                error={image.error}
+                                onImageChange={handleGeneratedImageChange(index)}
+                                onRegenerate={(prompt, aspectRatio) => handleRegeneration(index, prompt, aspectRatio)}
+                                onGenerateVideoFromPrompt={(prompt) => image.url && generateVideo(image.url, prompt)}
+                                regenerationTitle={t('common_regenTitle')}
+                                regenerationDescription={t('common_regenDescription')}
+                                regenerationPlaceholder={t('dressTheModel_regenPlaceholder')}
+                                onClick={image.status === 'done' && image.url ? () => openLightbox(lightboxImages.indexOf(image.url!)) : undefined}
+                                isMobile={isMobile}
+                            />
+                        </motion.div>
+                    ))}
                     {appState.historicalImages.map(sourceUrl => {
                         const videoTask = videoTasks[sourceUrl];
                         if (!videoTask) return null;
@@ -519,18 +619,6 @@ const DressTheModel: React.FC<DressTheModelProps> = (props) => {
             )}
 
             <Lightbox images={lightboxImages} selectedIndex={lightboxIndex} onClose={closeLightbox} onNavigate={navigateLightbox} />
-            <GalleryPicker
-                isOpen={isModelGalleryOpen}
-                onClose={() => setModelGalleryOpen(false)}
-                onSelect={(url) => { handleModelImageChange(url); setModelGalleryOpen(false); }}
-                images={imageGallery}
-            />
-             <GalleryPicker
-                isOpen={isClothingGalleryOpen}
-                onClose={() => setClothingGalleryOpen(false)}
-                onSelect={(url) => { handleClothingImageChange(url); setClothingGalleryOpen(false); }}
-                images={imageGallery}
-            />
             <QualityGuideModal isOpen={isGuideModalOpen} onClose={() => setGuideModalOpen(false)} />
         </div>
     );

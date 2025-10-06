@@ -53,7 +53,7 @@ export const renderSmartlyWrappedTitle = (title: string, enabled: boolean, words
 interface RegenerationModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirmImage: (prompt: string) => void;
+    onConfirmImage: (prompt: string, aspectRatio: string) => void;
     onConfirmVideo?: (prompt: string) => void;
     itemToModify: string | null;
     title?: string;
@@ -71,16 +71,20 @@ export const RegenerationModal: React.FC<RegenerationModalProps> = ({
     description = "Thêm yêu cầu để tinh chỉnh ảnh, hoặc dùng nó để tạo video cho",
     placeholder = "Ví dụ: tông màu ấm, phong cách phim xưa..."
 }) => {
+    const { t } = useAppControls();
     const [customPrompt, setCustomPrompt] = useState('');
+    const [aspectRatio, setAspectRatio] = useState('Giữ nguyên');
+    const ASPECT_RATIO_OPTIONS = t('aspectRatioOptions');
 
     useEffect(() => {
         if (isOpen) {
             setCustomPrompt('');
+            setAspectRatio('Giữ nguyên');
         }
     }, [isOpen]);
 
     const handleConfirmImage = () => {
-        onConfirmImage(customPrompt);
+        onConfirmImage(customPrompt, aspectRatio);
     };
 
     const handleConfirmVideo = () => {
@@ -124,7 +128,18 @@ export const RegenerationModal: React.FC<RegenerationModalProps> = ({
                             rows={3}
                             aria-label="Yêu cầu chỉnh sửa bổ sung"
                         />
-                        <div className="flex justify-end items-center gap-4 mt-2">
+                        <div className="mt-2">
+                            <label htmlFor="regen-aspect-ratio" className="block text-sm font-medium text-neutral-300 mb-1">{t('common_aspectRatio')}</label>
+                            <select
+                                id="regen-aspect-ratio"
+                                value={aspectRatio}
+                                onChange={(e) => setAspectRatio(e.target.value)}
+                                className="form-input !text-sm"
+                            >
+                                {ASPECT_RATIO_OPTIONS.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
+                        </div>
+                        <div className="flex justify-end items-center gap-4 mt-4">
                             <button onClick={onClose} className="btn btn-secondary btn-sm">
                                 Hủy
                             </button>
@@ -258,8 +273,15 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ stage, originalImage, 
                 if (key in obj) delete obj[key];
             }
             if ('stage' in obj && (obj.stage === 'generating' || obj.stage === 'results' || obj.stage === 'prompting')) {
-                if (currentView.viewId === 'free-generation') obj.stage = 'configuring';
-                else if ( ('uploadedImage' in obj && obj.uploadedImage) || ('modelImage' in obj && obj.modelImage && 'clothingImage' in obj && obj.clothingImage) || ('contentImage' in obj && obj.contentImage && 'styleImage' in obj && obj.styleImage) || ('inputImage' in obj && obj.inputImage && 'outputImage' in obj && obj.outputImage) ) {
+                if (currentView.viewId === 'free-generation') {
+                    obj.stage = 'configuring';
+                } else if (
+                    ('uploadedImage' in obj && obj.uploadedImage) ||
+                    ('modelImage' in obj && obj.modelImage && 'clothingImage' in obj && obj.clothingImage) ||
+                    ('contentImage' in obj && obj.contentImage && 'styleImage' in obj && obj.styleImage) ||
+                    ('inputImage' in obj && obj.inputImage && 'outputImage' in obj && obj.outputImage) ||
+                    ('productImage' in obj && obj.productImage && 'sceneImage' in obj && obj.sceneImage)
+                ) {
                      obj.stage = 'configuring';
                 } else {
                     obj.stage = 'idle';
@@ -342,7 +364,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ stage, originalImage, 
                     >
                         <button
                           className="btn btn-secondary"
-                          onClick={() => downloadJson({ viewId: currentView.viewId, state: getExportableState(currentView.state) }, `aPix-${currentView.viewId}-settings.json`)}
+                          onClick={() => downloadJson({ viewId: currentView.viewId, state: getExportableState(currentView.state) }, `Likekids-${currentView.viewId}-settings.json`)}
                           title={t('common_exportSettings_tooltip')}
                         >
                             {t('common_exportSettings')}

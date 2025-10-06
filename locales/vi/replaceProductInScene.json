@@ -1,5 +1,5 @@
 {
-  "replaceProductInScene_mainTitle": "Thay Sản Phẩm Vào Bối Cảnh",
+  "replaceProductInScene_mainTitle": "Thay nền sản phẩm",
   "replaceProductInScene_subtitle": "Tải ảnh sản phẩm và ảnh bối cảnh để bắt đầu",
   "replaceProductInScene_uploaderCaptionProduct": "Ảnh Sản Phẩm",
   "replaceProductInScene_uploaderDescriptionProduct": "Ảnh chứa sản phẩm cần ghép. AI sẽ tự động tách nền.",
@@ -38,7 +38,7 @@
   "replaceProductInScene_shootingStyleLabel": "Phong cách chụp",
   "replaceProductInScene_shootingStyleOptions": ["", "Trải sàn", "Treo móc", "Người cầm"],
   "replaceProductInScene_productShadowLabel": "Bóng sản phẩm",
-  "replaceProductInScene_productShadowOptions": ["", "Hòa trộn", "Tự nhiên", "Không đổ bóng", "Bóng đổ nhẹ", "Bóng đổ vừa", "Bóng đổ nhiều"],
+  "replaceProductInScene_productShadowOptions": ["", "Không đổ bóng", "Hòa trộn", "Bóng đổ nhẹ", "Bóng đổ vừa", "Bóng đổ nhiều"],
   "replaceProductInScene_aspectRatioLabel": "Tỷ lệ khung ảnh",
   "replaceProductInScene_lightingLabel": "Ánh sáng mô phỏng",
   "replaceProductInScene_lightingCategoryLabel": "Loại ánh sáng",
@@ -70,5 +70,6 @@
     "Ánh sáng tâm trạng (Moody Lighting)",
     "Ánh sáng huyền ảo / Mơ màng (Ethereal / Dreamy Lighting)"
   ],
-  "replaceProductInScene_syncLightingLabel": "Đồng bộ ánh sáng bối cảnh và sản phẩm"
+  "replaceProductInScene_synchronizeLighting": "Đồng bộ hóa ánh sáng",
+  "replaceProductInScene_synchronizeLighting_desc": "Tự động phân tích và điều chỉnh ánh sáng, màu sắc, và bóng đổ của sản phẩm để hòa hợp hoàn toàn với bối cảnh."
 }

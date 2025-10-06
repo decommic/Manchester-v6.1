@@ -38,7 +38,7 @@
   "replaceProductInScene_shootingStyleLabel": "Shooting Style",
   "replaceProductInScene_shootingStyleOptions": ["", "Flat Lay", "Hanging", "Held by Person"],
   "replaceProductInScene_productShadowLabel": "Product Shadow",
-  "replaceProductInScene_productShadowOptions": ["", "Blend", "Natural", "No Shadow", "Light Shadow", "Medium Shadow", "Heavy Shadow"],
+  "replaceProductInScene_productShadowOptions": ["", "No Shadow", "Blend", "Light Shadow", "Medium Shadow", "Heavy Shadow"],
   "replaceProductInScene_aspectRatioLabel": "Aspect Ratio",
   "replaceProductInScene_lightingLabel": "Simulated Lighting",
   "replaceProductInScene_lightingCategoryLabel": "Light Type",
@@ -70,5 +70,6 @@
     "Moody Lighting",
     "Ethereal / Dreamy Lighting"
   ],
-  "replaceProductInScene_syncLightingLabel": "Synchronize scene and product lighting"
+  "replaceProductInScene_synchronizeLighting": "Synchronize Lighting",
+  "replaceProductInScene_synchronizeLighting_desc": "Automatically analyzes and adjusts the product's lighting, color, and shadows to perfectly match the scene."
 }

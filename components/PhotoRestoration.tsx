@@ -139,14 +139,14 @@ const PhotoRestoration: React.FC<PhotoRestorationProps> = (props) => {
         }
     };
     
-    const handleRegeneration = async (prompt: string) => {
+    const handleRegeneration = async (prompt: string, aspectRatio: string) => {
         if (!appState.generatedImage) return;
 
         const preGenState = { ...appState };
         onStateChange({ ...appState, stage: 'generating', error: null });
 
         try {
-            const resultUrl = await editImageWithPrompt(appState.generatedImage, prompt);
+            const resultUrl = await editImageWithPrompt(appState.generatedImage, prompt, aspectRatio, appState.options.removeWatermark);
             const settingsToEmbed = {
                 viewId: 'photo-restoration',
                 state: { ...appState, stage: 'configuring', generatedImage: null, historicalImages: [], error: null },

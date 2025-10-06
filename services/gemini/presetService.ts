@@ -65,7 +65,8 @@ const presetConfig: Record<string, PresetConfig> = {
     },
     'free-generation': {
         imageKeys: ['image1', 'image2'],
-        generator: (images, preset) => generateFreeImage(preset.state.options.prompt, preset.state.options.numberOfImages, preset.state.options.aspectRatio, images[0], images[1], preset.state.options.removeWatermark),
+        // FIX: Removed extra `numberOfImages` argument to match the `generateFreeImage` function signature.
+        generator: (images, preset) => generateFreeImage(preset.state.options.prompt, preset.state.options.aspectRatio, images[0], images[1], preset.state.options.removeWatermark),
     },
     'image-interpolation': {
         imageKeys: ['referenceImage'],

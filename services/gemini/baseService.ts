@@ -156,7 +156,7 @@ export async function callGeminiWithRetry(parts: object[]): Promise<GenerateCont
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash-image-preview',
+                model: 'gemini-2.5-flash-image',
                 contents: { parts },
                 config: {
                     responseModalities: [Modality.IMAGE, Modality.TEXT],

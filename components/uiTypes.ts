@@ -144,7 +144,7 @@ export interface DressTheModelState {
     modelImage: string | null;
     clothingImage: string | null;
     referenceImage: string | null; 
-    generatedImage: string | null;
+    generatedImages: { caption: string; url?: string; error?: string; status: ImageStatus }[];
     historicalImages: string[];
     options: {
         background: string;
@@ -219,6 +219,20 @@ export interface MixStyleState {
         removeWatermark: boolean;
     };
     finalPrompt: string | null;
+    error: string | null;
+}
+
+export interface FreeGenerationState {
+    stage: 'configuring' | 'generating' | 'results';
+    image1: string | null;
+    image2: string | null;
+    generatedImages: string[];
+    historicalImages: string[];
+    options: {
+        prompt: string;
+        removeWatermark: boolean;
+        aspectRatio: string;
+    };
     error: string | null;
 }
 
@@ -328,22 +342,7 @@ export interface ReplaceProductInSceneState {
         naturalLight: string;
         studioLight: string;
         styleLight: string;
-        syncLighting: boolean;
-    };
-    error: string | null;
-}
-
-export interface FreeGenerationState {
-    stage: 'configuring' | 'generating' | 'results';
-    image1: string | null;
-    image2: string | null;
-    generatedImages: string[];
-    historicalImages: string[];
-    options: {
-        prompt: string;
-        removeWatermark: boolean;
-        numberOfImages: number;
-        aspectRatio: string;
+        synchronizeLighting: boolean;
     };
     error: string | null;
 }
@@ -429,7 +428,7 @@ export const getInitialStateForApp = (viewId: string): AnyAppState => {
         case 'baby-photo-creator':
             return { stage: 'idle', uploadedImage: null, generatedImages: {}, historicalImages: [], selectedIdeas: [], options: { additionalPrompt: '', removeWatermark: false, aspectRatio: 'Giữ nguyên' }, error: null };
         case 'dress-the-model':
-            return { stage: 'idle', modelImage: null, clothingImage: null, referenceImage: null, generatedImage: null, historicalImages: [], options: { background: '', pose: '', style: '', aspectRatio: 'Giữ nguyên', notes: '', removeWatermark: false, naturalEnhancementMode: 'automatic', naturalEnhancementRefs: [null, null, null, null], faceRestore: true, upscale: 'Không', denoise: 'Tắt', sharpen: 'Tắt' }, error: null };
+            return { stage: 'idle', modelImage: null, clothingImage: null, referenceImage: null, generatedImages: [], historicalImages: [], options: { background: '', pose: '', style: '', aspectRatio: 'Giữ nguyên', notes: '', removeWatermark: false, naturalEnhancementMode: 'automatic', naturalEnhancementRefs: [null, null, null, null], faceRestore: true, upscale: 'Không', denoise: 'Tắt', sharpen: 'Tắt' }, error: null };
         case 'photo-restoration':
             return { stage: 'idle', uploadedImage: null, generatedImage: null, historicalImages: [], options: { type: 'Chân dung', gender: 'Tự động', age: '', nationality: '', notes: '', removeWatermark: false, removeStains: true }, error: null };
         case 'image-to-real':
@@ -439,7 +438,7 @@ export const getInitialStateForApp = (viewId: string): AnyAppState => {
         case 'mix-style':
             return { stage: 'idle', contentImage: null, styleImage: null, generatedImage: null, historicalImages: [], options: { styleStrength: 'Rất mạnh', notes: '', removeWatermark: false }, finalPrompt: null, error: null };
         case 'free-generation':
-            return { stage: 'configuring', image1: null, image2: null, generatedImages: [], historicalImages: [], options: { prompt: '', removeWatermark: false, numberOfImages: 1, aspectRatio: 'Giữ nguyên' }, error: null };
+            return { stage: 'configuring', image1: null, image2: null, generatedImages: [], historicalImages: [], options: { prompt: '', removeWatermark: false, aspectRatio: 'Giữ nguyên' }, error: null };
         case 'toy-model-creator':
             return { 
                 stage: 'idle', 
@@ -497,7 +496,7 @@ export const getInitialStateForApp = (viewId: string): AnyAppState => {
                     layout: '', sceneStyle: 'Hòa trộn', shootingStyle: '', productDescription: '',
                     sceneDescription: '', sceneAction: 'Xóa sản phẩm trong bối cảnh', productScale: '', productShadow: '',
                     decoNotes: '', aspectRatio: 'Giữ nguyên', lightingCategory: 'natural', naturalLight: '',
-                    studioLight: '', styleLight: '', syncLighting: true
+                    studioLight: '', styleLight: '', synchronizeLighting: true
                 }, 
                 error: null 
             };

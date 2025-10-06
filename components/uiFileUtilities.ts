@@ -287,7 +287,7 @@ export const embedJsonInPng = async (imageDataUrl: string, jsonData: object, ena
 
         const iendIndex = view.length - 12;
 
-        const chunkType = new TextEncoder().encode('apIX');
+        const chunkType = new TextEncoder().encode('liKe');
         const chunkDataStr = JSON.stringify(jsonData);
         const chunkData = new TextEncoder().encode(chunkDataStr);
         const chunkLength = chunkData.length;
@@ -341,7 +341,7 @@ export const extractJsonFromPng = async (file: File): Promise<object | null> => 
             const typeBytes = uint8View.slice(offset + 4, offset + 8);
             const type = new TextDecoder().decode(typeBytes);
 
-            if (type === 'apIX') {
+            if (type === 'liKe') {
                 const dataBytes = uint8View.slice(offset + 8, offset + 8 + length);
                 const jsonString = new TextDecoder().decode(dataBytes);
                 return JSON.parse(jsonString);

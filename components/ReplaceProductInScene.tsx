@@ -21,9 +21,10 @@ import {
     SearchableSelect,
     useAppControls,
     embedJsonInPng,
+    Switch,
 } from './uiUtils';
 import { cn } from '../lib/utils';
-import { CheckIcon, CloseIcon } from './icons';
+import { CheckIcon, CloseIcon, DeleteIcon } from './icons';
 
 interface ReplaceProductInSceneProps {
     mainTitle: string;
@@ -96,7 +97,7 @@ const ReplaceProductInScene: React.FC<ReplaceProductInSceneProps> = (props) => {
         addImagesToGallery([newUrl]);
     };
 
-    const handleClearDecoImage = (imageType: keyof ReplaceProductInSceneState) => {
+    const handleClearImage = (imageType: keyof ReplaceProductInSceneState) => {
         onStateChange({ ...appState, [imageType]: null });
     };
     
@@ -263,7 +264,7 @@ const ReplaceProductInScene: React.FC<ReplaceProductInSceneProps> = (props) => {
                             </div>
 
                              {/* LIGHTING SECTION */}
-                            <div className="space-y-4 p-4 bg-neutral-900/30 rounded-lg border border-white/10">
+                             <div className="space-y-4 p-4 bg-neutral-900/30 rounded-lg border border-white/10">
                                 <h3 className="font-bold text-xl text-yellow-300">{t('replaceProductInScene_lightingLabel')}</h3>
                                 <div>
                                     <label className="block text-left base-font font-bold text-lg text-neutral-200 mb-2">{t('replaceProductInScene_lightingCategoryLabel')}</label>
@@ -297,18 +298,16 @@ const ReplaceProductInScene: React.FC<ReplaceProductInSceneProps> = (props) => {
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
-                                <div className="flex items-center pt-4 mt-4 border-t border-white/10">
-                                    <input
-                                        type="checkbox"
-                                        id="sync-lighting-checkbox"
-                                        checked={appState.options.syncLighting}
-                                        onChange={(e) => handleOptionChange('syncLighting', e.target.checked)}
-                                        className="h-4 w-4 rounded border-neutral-500 bg-neutral-700 text-yellow-400 focus:ring-yellow-400 focus:ring-offset-neutral-800"
-                                        aria-label={t('replaceProductInScene_syncLightingLabel')}
-                                    />
-                                    <label htmlFor="sync-lighting-checkbox" className="ml-3 block text-sm font-medium text-neutral-300">
-                                        {t('replaceProductInScene_syncLightingLabel')}
-                                    </label>
+                                <div className="pt-4 border-t border-white/10">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label htmlFor="sync-lighting-toggle" className="block text-left base-font font-bold text-lg text-neutral-200">{t('replaceProductInScene_synchronizeLighting')}</label>
+                                        <Switch
+                                            id="sync-lighting-toggle"
+                                            checked={appState.options.synchronizeLighting}
+                                            onChange={(v) => handleOptionChange('synchronizeLighting', v)}
+                                        />
+                                    </div>
+                                    <p className="text-xs text-neutral-500">{t('replaceProductInScene_synchronizeLighting_desc')}</p>
                                 </div>
                             </div>
     
@@ -317,31 +316,32 @@ const ReplaceProductInScene: React.FC<ReplaceProductInSceneProps> = (props) => {
                                  <h3 className="font-bold text-xl text-yellow-300">Trang trí (Deco) - Nâng cao</h3>
                                 <div>
                                     <SearchableSelect id="aspectRatio" label={t('replaceProductInScene_aspectRatioLabel')} options={ASPECT_RATIO_OPTIONS} value={appState.options.aspectRatio} onChange={(v) => handleOptionChange('aspectRatio', v)} />
-                                    <label htmlFor="deco-notes" className="block text-left base-font font-bold text-lg text-neutral-200 mt-4 mb-2">{t('replaceProductInScene_decoNotesLabel')}</label>
+                                    <label htmlFor="deco-notes" className="block text-left base-font font-bold text-lg text-neutral-200 mt-4 mb-2">Họa tiết deco</label>
                                     <div className="flex gap-2 deco-uploader-container mb-3">
                                         {[1, 2, 3, 4, 5].map(i => {
-                                            const imageKey = `decoImage${i}` as keyof ReplaceProductInSceneState;
-                                            const imageUrl = (appState as any)[imageKey] as string | null | undefined;
+                                            const decoImageKey = `decoImage${i}` as keyof ReplaceProductInSceneState;
+                                            const currentImage = (appState as any)[decoImageKey];
                                             return (
-                                                <div key={i} className="w-24 relative group">
+                                                <div key={i} className="w-24 flex flex-col items-center gap-1">
                                                     <ActionablePolaroidCard
-                                                        type="uploader"
+                                                        type={currentImage ? 'multi-input' : 'uploader'}
                                                         caption={t('replaceProductInScene_uploaderCaptionDeco', i)}
                                                         status="done"
-                                                        mediaUrl={imageUrl || undefined}
+                                                        mediaUrl={currentImage || undefined}
                                                         placeholderType="style"
-                                                        onImageChange={handleImageChange(imageKey)}
+                                                        onImageChange={handleImageChange(decoImageKey)}
+                                                        onClear={undefined}
                                                     />
-                                                    {imageUrl && (
+                                                    {currentImage && (
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                handleClearDecoImage(imageKey);
+                                                                handleClearImage(decoImageKey);
                                                             }}
-                                                            className="absolute top-1 right-1 z-30 p-1 bg-red-600/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
-                                                            title="Xóa ảnh"
+                                                            className="p-1.5 bg-neutral-800/50 rounded-full text-neutral-400 hover:bg-red-600/80 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-400 transition-colors"
+                                                            aria-label={`Xóa ${t('replaceProductInScene_uploaderCaptionDeco', i)}`}
                                                         >
-                                                            <CloseIcon className="h-3 w-3" strokeWidth={3} />
+                                                            <DeleteIcon className="h-4 w-4" />
                                                         </button>
                                                     )}
                                                 </div>

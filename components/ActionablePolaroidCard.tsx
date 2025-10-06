@@ -41,8 +41,9 @@ interface ActionablePolaroidCardProps {
 
     // Callbacks for actions
     onImageChange?: (imageDataUrl: string) => void;
-    onRegenerate?: (prompt: string) => void;
+    onRegenerate?: (prompt: string, aspectRatio: string) => void;
     onGenerateVideoFromPrompt?: (prompt: string) => void;
+    onClear?: () => void;
     
     // Props for modals
     regenerationTitle?: string;
@@ -63,6 +64,7 @@ const ActionablePolaroidCard: React.FC<ActionablePolaroidCardProps> = ({
     onImageChange,
     onRegenerate,
     onGenerateVideoFromPrompt,
+    onClear,
     regenerationTitle,
     regenerationDescription,
     regenerationPlaceholder,
@@ -71,7 +73,7 @@ const ActionablePolaroidCard: React.FC<ActionablePolaroidCardProps> = ({
     const { imageGallery, t } = useAppControls();
     const [isRegenModalOpen, setIsRegenModalOpen] = useState(false);
     const [isGalleryPickerOpen, setGalleryPickerOpen] = useState(false);
-    const [isWebcamModalOpen, setWebcamModalOpen] = useState(false);
+    const [isWebcamModalOpen, setIsWebcamModalOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isDraggingOver, setIsDraggingOver] = useState(false);
 
@@ -136,10 +138,10 @@ const ActionablePolaroidCard: React.FC<ActionablePolaroidCardProps> = ({
         setIsRegenModalOpen(true);
     }, []);
 
-    const handleConfirmImage = useCallback((prompt: string) => {
+    const handleConfirmImage = useCallback((prompt: string, aspectRatio: string) => {
         setIsRegenModalOpen(false);
         if (onRegenerate) {
-            onRegenerate(prompt);
+            onRegenerate(prompt, aspectRatio);
         }
     }, [onRegenerate]);
 
@@ -169,14 +171,16 @@ const ActionablePolaroidCard: React.FC<ActionablePolaroidCardProps> = ({
     };
 
     const handleOpenWebcam = useCallback(() => {
-        setWebcamModalOpen(true);
+        // FIX: Corrected typo from `setWebcamModalOpen` to `setIsWebcamModalOpen`.
+        setIsWebcamModalOpen(true);
     }, []);
 
     const handleWebcamCapture = (imageDataUrl: string) => {
         if (onImageChange) {
             onImageChange(imageDataUrl);
         }
-        setWebcamModalOpen(false);
+        // FIX: Corrected typo from `setWebcamModalOpen` to `setIsWebcamModalOpen`.
+        setIsWebcamModalOpen(false);
     };
 
     // Determine the primary click action for the card.
@@ -214,6 +218,7 @@ const ActionablePolaroidCard: React.FC<ActionablePolaroidCardProps> = ({
                 onSelectFromGallery={isGallerySelectable ? handleOpenGalleryPicker : undefined}
                 onCaptureFromWebcam={isWebcamSelectable ? handleOpenWebcam : undefined}
                 onShake={showButtons && canDoSomething ? handleRegenerateClick : undefined}
+                onClear={showButtons && onClear ? onClear : undefined}
                 isDraggingOver={isDraggingOver}
                 onDragOver={isSwappable ? handleDragOver : undefined}
                 onDragLeave={isSwappable ? handleDragLeave : undefined}
@@ -239,7 +244,7 @@ const ActionablePolaroidCard: React.FC<ActionablePolaroidCardProps> = ({
             />
             <WebcamCaptureModal
                 isOpen={isWebcamModalOpen}
-                onClose={() => setWebcamModalOpen(false)}
+                onClose={() => setIsWebcamModalOpen(false)}
                 onCapture={handleWebcamCapture}
             />
         </>

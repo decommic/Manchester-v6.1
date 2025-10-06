@@ -1,7 +1,3 @@
-
-
-
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -62,8 +58,8 @@ export interface Settings {
     replaceProductInScene: AppSettings;
 }
 
-export type Theme = 'sdvn' | 'vietnam' | 'black-night' | 'clear-sky' | 'skyline' | 'emerald-water' | 'life' | 'violet' | 'hidden-jaguar' | 'wide-matrix';
-export const THEMES: Theme[] = ['sdvn', 'vietnam', 'black-night', 'clear-sky', 'skyline', 'emerald-water', 'life', 'violet', 'hidden-jaguar', 'wide-matrix'];
+export type Theme = 'vietnam' | 'black-night' | 'clear-sky' | 'skyline' | 'emerald-water' | 'life' | 'violet' | 'hidden-jaguar' | 'wide-matrix';
+export const THEMES: Theme[] = ['vietnam', 'black-night', 'clear-sky', 'skyline', 'emerald-water', 'life', 'violet', 'hidden-jaguar', 'wide-matrix'];
 
 export interface ThemeInfo {
     id: Theme;
@@ -72,7 +68,6 @@ export interface ThemeInfo {
 }
 
 export const THEME_DETAILS: ThemeInfo[] = [
-    { id: 'sdvn', name: 'SDVN', colors: ['#5858e6', '#151523'] },
     { id: 'vietnam', name: 'Việt Nam', colors: ['#DA251D', '#a21a14'] },
     { id: 'black-night', name: 'Black Night', colors: ['#3d3d3d', '#090a0f'] },
     { id: 'clear-sky', name: 'Clear Sky', colors: ['#005C97', '#363795'] },
@@ -240,7 +235,6 @@ export interface FreeGenerationState {
     options: {
         prompt: string;
         removeWatermark: boolean;
-        numberOfImages: number;
         aspectRatio: string;
     };
     error: string | null;
@@ -427,7 +421,7 @@ export const getInitialStateForApp = (viewId: string): AnyAppState => {
         case 'mix-style':
             return { stage: 'idle', contentImage: null, styleImage: null, generatedImage: null, historicalImages: [], options: { styleStrength: 'Rất mạnh', notes: '', removeWatermark: false }, finalPrompt: null, error: null };
         case 'free-generation':
-            return { stage: 'configuring', image1: null, image2: null, generatedImages: [], historicalImages: [], options: { prompt: '', removeWatermark: false, numberOfImages: 1, aspectRatio: 'Giữ nguyên' }, error: null };
+            return { stage: 'configuring', image1: null, image2: null, generatedImages: [], historicalImages: [], options: { prompt: '', removeWatermark: false, aspectRatio: 'Giữ nguyên' }, error: null };
         case 'toy-model-creator':
             return { 
                 stage: 'idle', 

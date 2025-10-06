@@ -113,14 +113,14 @@ const ArchitectureIdeator: React.FC<ArchitectureIdeatorProps> = (props) => {
         }
     };
 
-    const handleRegeneration = async (prompt: string) => {
+    const handleRegeneration = async (prompt: string, aspectRatio: string) => {
         if (!appState.generatedImage) return;
 
         const preGenState = { ...appState };
         onStateChange({ ...appState, stage: 'generating', error: null });
 
         try {
-            const resultUrl = await editImageWithPrompt(appState.generatedImage, prompt);
+            const resultUrl = await editImageWithPrompt(appState.generatedImage, prompt, aspectRatio, appState.options.removeWatermark);
              const settingsToEmbed = { 
                 viewId: 'architecture-ideator', 
                 // Embed the state that led to this result, but clear the results themselves.

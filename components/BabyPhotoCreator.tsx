@@ -241,7 +241,7 @@ const BabyPhotoCreator: React.FC<BabyPhotoCreatorProps> = (props) => {
         await executeGeneration([t('babyPhotoCreator_randomConcept')]);
     };
 
-    const handleRegenerateIdea = async (idea: string, customPrompt: string) => {
+    const handleRegenerateIdea = async (idea: string, customPrompt: string, aspectRatio: string) => {
         const imageToEditState = appState.generatedImages[idea];
         // FIX: Replaced unsafe type assertion with a simpler, safer type guard.
         if (!imageToEditState || imageToEditState.status !== 'done' || !imageToEditState.url) {
@@ -257,7 +257,7 @@ const BabyPhotoCreator: React.FC<BabyPhotoCreatorProps> = (props) => {
         });
 
         try {
-            const resultUrl = await editImageWithPrompt(imageUrlToEdit, customPrompt);
+            const resultUrl = await editImageWithPrompt(imageUrlToEdit, customPrompt, aspectRatio, appState.options.removeWatermark);
             const settingsToEmbed = {
                 viewId: 'baby-photo-creator',
                 state: { ...appState, stage: 'configuring', generatedImages: {}, historicalImages: [], error: null },
@@ -505,7 +505,7 @@ const BabyPhotoCreator: React.FC<BabyPhotoCreatorProps> = (props) => {
                                     mediaUrl={imageState?.url}
                                     error={imageState?.error}
                                     onImageChange={handleGeneratedImageChange(idea)}
-                                    onRegenerate={(prompt) => handleRegenerateIdea(idea, prompt)}
+                                    onRegenerate={(prompt, aspectRatio) => handleRegenerateIdea(idea, prompt, aspectRatio)}
                                     onGenerateVideoFromPrompt={(prompt) => imageState?.url && generateVideo(imageState.url, prompt)}
                                     regenerationTitle={t('common_regenTitle')}
                                     regenerationDescription={t('common_regenDescription')}

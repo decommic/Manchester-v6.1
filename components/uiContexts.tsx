@@ -44,7 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const defaultSettingsOnError: LoginSettings = {
                 enabled: true,
                 accounts: [
-                    { username: "aPix", password: "sdvn" },
+                    { username: "Likekids", password: "sdvn" },
                     { username: "guest", password: "123" }
                 ]
             };

@@ -26,7 +26,7 @@ interface ReplaceProductOptions {
     naturalLight?: string;
     studioLight?: string;
     styleLight?: string;
-    syncLighting?: boolean;
+    synchronizeLighting?: boolean;
 }
 
 /**
@@ -76,11 +76,12 @@ export async function generateReplacedProductImage(
     
     const promptParts: string[] = [];
     
+    promptParts.push('Bạn là một nghệ sĩ ghép ảnh và chuyên gia ánh sáng kỹ thuật số. Nhiệm vụ của bạn là thực hiện một quy trình phức tạp để tạo ra một bức ảnh sản phẩm siêu thực và chuyên nghiệp.');
+
     if (referenceImageUrl) {
         promptParts.push(
-            `**PHÂN TÍCH ẢNH THAM CHIẾU (Ảnh ${imageCounter}):**`,
-            'Phân tích kỹ lưỡng ảnh này để xác định phong cách nghệ thuật, đặc biệt là về ánh sáng, tông màu, và không khí chung. Nhiệm vụ của bạn là áp dụng CHÍNH XÁC phong cách này vào ảnh kết quả cuối cùng để đảm bảo tính nhất quán.',
-            ''
+            `\n**PHÂN TÍCH ẢNH THAM CHIẾU (Ảnh ${imageCounter}):**`,
+            'Phân tích kỹ lưỡng ảnh này để xác định phong cách nghệ thuật, đặc biệt là về ánh sáng, tông màu, và không khí chung. Nhiệm vụ của bạn là áp dụng CHÍNH XÁC phong cách này vào ảnh kết quả cuối cùng để đảm bảo tính nhất quán.'
         );
     }
 
@@ -88,16 +89,13 @@ export async function generateReplacedProductImage(
         promptParts.push(...getAspectRatioPromptInstruction(options.aspectRatio, 1));
     }
 
-    promptParts.push(
-        'Bạn là một chuyên gia ghép ảnh sản phẩm AI. Nhiệm vụ của bạn là thực hiện một quy trình phức tạp để tạo ra một bức ảnh sản phẩm chuyên nghiệp.',
-        '**QUY TRÌNH BẮT BUỘC:**'
-    );
+    promptParts.push('\n**QUY TRÌNH BẮT BUỘC:**');
     
     const sceneActionInstruction = options.sceneAction === 'Giữ nguyên bối cảnh' || options.sceneAction === 'Keep Scene As-Is'
         ? 'GIỮ NGUYÊN bối cảnh gốc. TUYỆT ĐỐI KHÔNG xóa bất kỳ vật thể nào.'
-        : 'Kiểm tra kỹ ảnh bối cảnh (Ảnh 2). Nếu ảnh này chứa một chủ thể nổi bật (ví dụ: một người mẫu, một sản phẩm thời trang khác như váy, áo, túi xách), hãy **XÓA** chủ thể đó đi một cách hoàn hảo. Sau khi xóa, hãy sử dụng kỹ thuật inpainting để tái tạo lại phần nền bị che một cách thông minh và liền mạch, đảm bảo không để lại dấu vết. Nếu bối cảnh vốn đã không có chủ thể nổi bật, hãy bỏ qua bước này.';
+        : 'Kiểm tra kỹ ảnh bối cảnh (Ảnh 2). Nếu ảnh này chứa một chủ thể nổi bật (ví dụ: một người mẫu, một sản phẩm thời trang khác), hãy **XÓA** chủ thể đó đi một cách hoàn hảo. Sau khi xóa, hãy sử dụng kỹ thuật inpainting để tái tạo lại phần nền bị che một cách thông minh và liền mạch, đảm bảo không để lại dấu vết. Nếu bối cảnh vốn đã không có chủ thể nổi bật, hãy bỏ qua bước này.';
     
-    let productAnalysisPrompt = '1. **PHÂN TÍCH ẢNH SẢN PHẨM (Ảnh 1):** Tự động nhận diện chủ thể sản phẩm chính. Tách nền sản phẩm một cách hoàn hảo, giữ lại mọi chi tiết, bóng đổ tự nhiên của sản phẩm nếu có.';
+    let productAnalysisPrompt = '1. **PHÂN TÍCH ẢNH SẢN PHẨM (Ảnh 1):** Tự động nhận diện chủ thể sản phẩm chính. Tách nền sản phẩm một cách hoàn hảo, giữ lại mọi chi tiết.';
     if(options.productDescription) {
         productAnalysisPrompt += `\n   - **Mô tả bổ sung về sản phẩm:** ${options.productDescription}. Hãy đảm bảo các chi tiết này được thể hiện rõ trên sản phẩm cuối cùng.`
     }
@@ -106,24 +104,50 @@ export async function generateReplacedProductImage(
     if(options.sceneDescription) {
         sceneAnalysisPrompt += `\n   - **Mô tả bổ sung về bối cảnh:** ${options.sceneDescription}. Hãy sử dụng mô tả này để tinh chỉnh hoặc tạo ra bối cảnh cuối cùng.`
     }
+    
+    promptParts.push(productAnalysisPrompt, sceneAnalysisPrompt);
 
-    promptParts.push(
-        productAnalysisPrompt,
-        sceneAnalysisPrompt,
-        '3. **GHÉP ẢNH THÔNG MINH:** Đặt sản phẩm đã tách nền từ Bước 1 vào bối cảnh đã xử lý từ Bước 2. Việc ghép ảnh phải siêu thực, bao gồm việc điều chỉnh ánh sáng, màu sắc, và tạo bóng đổ phù hợp để sản phẩm hòa hợp hoàn toàn với môi trường.',
-    );
+    // --- STEP 3: COMPOSITION AND LIGHTING ---
+    promptParts.push('3. **GHÉP & HÒA TRỘN:** Đặt sản phẩm đã tách nền từ Bước 1 vào bối cảnh đã xử lý từ Bước 2 và thực hiện các bước hòa trộn sau:');
 
-    if (options.syncLighting) {
+    if (options.synchronizeLighting) {
         promptParts.push(
-            '   - **Đồng bộ ánh sáng (QUAN TRỌNG):** Phân tích kỹ lưỡng ánh sáng và bóng đổ trong bối cảnh (ví dụ: vệt nắng, bóng râm từ vật thể khác). Ánh sáng và bóng đổ này phải được áp dụng một cách chân thực lên sản phẩm, như thể sản phẩm là một phần của bối cảnh đó. Nếu có một vệt sáng đi qua vị trí đặt sản phẩm, vệt sáng đó cũng phải hiện diện trên sản phẩm.'
+           '   **3A. TÁI CHIẾU SÁNG (RE-LIGHTING) - YÊU CẦU ƯU TIÊN CAO NHẤT:**',
+           '   - **Phân tích ánh sáng bối cảnh:** Phân tích sâu hướng, màu sắc, cường độ, và chất lượng bóng đổ (mềm/gắt) từ Ảnh 2.',
+           '   - **Loại bỏ ánh sáng gốc:** HOÀN TOÀN LOẠI BỎ mọi thông tin ánh sáng và bóng đổ gốc của sản phẩm.',
+           '   - **Tái tạo ánh sáng mới:** Dựa trên phân tích bối cảnh, "vẽ" lại hoàn toàn các vùng sáng (highlights) và vùng tối (shadows) trên bề mặt sản phẩm để nó khớp 100% với môi trường.',
+           '   - **Hòa trộn màu sắc:** Áp dụng một lớp màu (color cast) lên sản phẩm để nhiệt độ màu của nó hòa hợp với không khí chung (ví dụ: ám vàng cam trong cảnh hoàng hôn).',
+           '   - **Thêm phản xạ môi trường:** Thêm các phản xạ màu sắc tinh tế từ môi trường xung quanh (ví dụ: ánh xanh của cây cỏ) lên bề mặt sản phẩm.'
+        );
+    } else {
+        promptParts.push(
+            '   **3A. HÒA HỢP ÁNH SÁNG CƠ BẢN:** Điều chỉnh độ sáng, độ tương phản và màu sắc của sản phẩm để phù hợp với không khí chung của bối cảnh.'
         );
     }
+
+    promptParts.push(
+        '   **3B. TƯƠNG TÁC VẬT LÝ VỚI HIỆU ỨNG ÁNH SÁNG (YÊU CẦU GHI ĐÈ - OVERRIDE):**',
+        '   - Đây là yêu cầu vật lý, phải được tuân thủ tuyệt đối.',
+        '   - Nếu bối cảnh có các hiệu ứng như **tia nắng (sunbeam/light ray)**, lóa ống kính (lens flare), chúng phải tương tác chính xác với sản phẩm.',
+        '   - Tia nắng phải chiếu **LÊN BỀ MẶT** sản phẩm hoặc bị sản phẩm **CHE KHUẤT**.',
+        '   - **TUYỆT ĐỐI KHÔNG** được render tia nắng hoặc các hiệu ứng ánh sáng khác nằm ở một lớp (layer) riêng biệt bên dưới hoặc xuyên qua sản phẩm. Sản phẩm là vật thể rắn.'
+    );
     
+    promptParts.push('   **3C. TẠO BÓNG ĐỔ (SHADOW GENERATION):**');
+    if (options.productShadow === 'Không đổ bóng' || options.productShadow === 'No Shadow') {
+        promptParts.push('   - **YÊU CẦU GHI ĐÈ (OVERRIDE): TUYỆT ĐỐI KHÔNG TẠO BẤT KỲ BÓNG ĐỔ NÀO CHO SẢN PHẨM.**');
+    } else if (options.synchronizeLighting && (options.productShadow === 'Hòa trộn' || options.productShadow === 'Blend' || !options.productShadow || options.productShadow === '')) {
+        promptParts.push('   - Tạo ra một bóng đổ mới cho sản phẩm có **hướng, độ mềm/gắt, và màu sắc PHÙ HỢP TUYỆT ĐỐI** với các bóng đổ của những vật thể khác trong bối cảnh. Phân tích kỹ các bóng đổ hiện có trong Ảnh 2 để sao chép chính xác đặc điểm của chúng.');
+    } else {
+        const shadowInstruction = (options.productShadow && options.productShadow !== 'Tự động' && options.productShadow !== 'Auto' && options.productShadow.trim() !== '') ? options.productShadow : 'Bóng đổ vừa';
+        promptParts.push(`   - Tạo ra một ${shadowInstruction.toLowerCase()} cho sản phẩm. Đảm bảo hướng bóng đổ phù hợp với hướng sáng chung của bối cảnh.`);
+    }
+
     if (decoImageCounter > 0) {
         promptParts.push(`4. **DECO SÁNG TẠO (Ảnh 3 đến Ảnh ${3 + decoImageCounter - 1}):** Phân tích (các) ảnh deco này. **YÊU CẦU QUAN TRỌNG:** Chỉ xác định và lấy các **chi tiết trang trí nhỏ lẻ** hoặc các **yếu tố phụ** (ví dụ: hoa, lá, vệt sáng, họa tiết nhỏ) từ (các) ảnh deco này. **TUYỆT ĐỐI KHÔNG** sử dụng toàn bộ ảnh deco làm bối cảnh mới. Sau đó, hãy thêm các chi tiết nhỏ đã trích xuất này vào bối cảnh chính một cách tinh tế để làm cho nó thêm phần sáng tạo và hài hòa. ${options.decoNotes ? `Làm theo chỉ dẫn cụ thể sau từ người dùng: "${options.decoNotes}"` : ''}`);
     }
 
-    promptParts.push('\n**HƯỚNG DẪN CHI TIẾT:**');
+    promptParts.push('\n**HƯỚNG DẪN CHI TIẾT BỔ SUNG:**');
     
     const layoutMapping: { [key: string]: string } = {
         'Bố Cục Flat Lay (Chụp từ trên xuống)': 'Đặt sản phẩm theo bố cục Flat Lay (chụp thẳng từ trên xuống). Sắp xếp sản phẩm và các phụ kiện liên quan một cách nghệ thuật trên một bề mặt phẳng. Mô phỏng hình dáng sản phẩm như đang được mặc.',
@@ -149,20 +173,16 @@ export async function generateReplacedProductImage(
 
     if (layoutInstruction) {
         promptParts.push(`- **Bố cục:** ${layoutInstruction}`);
-    } else if (options.layout && options.layout !== 'Tự động' && options.layout !== 'Auto') {
+    } else if (options.layout && options.layout !== 'Tự động' && options.layout !== 'Auto' && options.layout.trim() !== '') {
         promptParts.push(`- **Bố cục:** Đặt sản phẩm theo kiểu "${options.layout}".`);
     }
 
-    if (options.shootingStyle && options.shootingStyle !== 'Tự động' && options.shootingStyle !== 'Auto') {
+    if (options.shootingStyle && options.shootingStyle !== 'Tự động' && options.shootingStyle !== 'Auto' && options.shootingStyle.trim() !== '') {
         promptParts.push(`- **Phong cách chụp:** ${options.shootingStyle}.`);
     }
 
-    if (options.productScale && options.productScale !== 'Tự động' && options.productScale !== 'Auto') {
+    if (options.productScale && options.productScale !== 'Tự động' && options.productScale !== 'Auto' && options.productScale.trim() !== '') {
         promptParts.push(`- **Tỷ lệ sản phẩm:** Sản phẩm được ghép vào phải có kích thước tương đối ${options.productScale.toLowerCase()} so với bối cảnh.`);
-    }
-
-    if (options.productShadow && options.productShadow.trim() !== '' && !options.productShadow.toLowerCase().includes('tự động')) {
-        promptParts.push(`- **Bóng đổ sản phẩm:** ${options.productShadow}.`);
     }
 
     let lightingInstruction = '';
@@ -172,7 +192,7 @@ export async function generateReplacedProductImage(
         case 'style': lightingInstruction = options.styleLight || ''; break;
     }
 
-    if (lightingInstruction && lightingInstruction !== 'Tự động' && lightingInstruction !== 'Auto') {
+    if (lightingInstruction && lightingInstruction !== 'Tự động' && lightingInstruction !== 'Auto' && lightingInstruction.trim() !== '') {
         promptParts.push(`- **Ánh sáng:** ${lightingInstruction}. Ánh sáng này phải được áp dụng cho toàn bộ cảnh một cách chân thực, bao gồm cả việc tạo bóng đổ và phản chiếu chính xác cho sản phẩm.`);
     }
 
@@ -190,7 +210,7 @@ export async function generateReplacedProductImage(
 
     promptParts.push(styleMapping[options.sceneStyle] || styleMappingEn[options.sceneStyle] || styleMapping['Hòa trộn']);
     
-    promptParts.push('\nKết quả cuối cùng phải là một bức ảnh duy nhất, chất lượng cao. Chỉ trả về ảnh kết quả.');
+    promptParts.push('\nKết quả cuối cùng phải là một bức ảnh duy nhất, chất lượng cao và siêu thực. Chỉ trả về ảnh kết quả.');
 
     const prompt = promptParts.join('\n');
     const textPart = { text: prompt };

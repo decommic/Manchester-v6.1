@@ -24,6 +24,8 @@ interface LayerComposerModalProps {
 
 export const LayerComposerModal: React.FC<LayerComposerModalProps> = ({ isOpen, onClose, onHide, initialImages, onInitialImagesConsumed }) => {
     const state = useLayerComposerState({ isOpen, onClose, onHide, initialImages, onInitialImagesConsumed });
+    // FIX: Derive selectedLayerId from state.selectedLayerIds
+    const selectedLayerId = state.selectedLayerIds.length === 1 ? state.selectedLayerIds[0] : null;
 
     return ReactDOM.createPortal(
         <>
@@ -84,7 +86,8 @@ export const LayerComposerModal: React.FC<LayerComposerModalProps> = ({ isOpen, 
                         </div>
                     ) : (
                         <>
-                            <LayerComposerSidebar {...state} />
+                            {/* FIX: Pass missing selectedLayerId and map deleteLayer to onLayerDelete */}
+                            <LayerComposerSidebar {...state} selectedLayerId={selectedLayerId} onLayerDelete={state.deleteLayer} />
                             <LayerComposerCanvas {...state} />
                         </>
                     )}

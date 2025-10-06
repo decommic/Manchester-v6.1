@@ -206,7 +206,7 @@ const ImageInterpolation: React.FC<ImageInterpolationProps> = (props) => {
         }
     };
 
-    const handleRegeneration = async (prompt: string) => {
+    const handleRegeneration = async (prompt: string, aspectRatio: string) => {
         if (!appState.generatedImage) return;
 
         const preGenState = { ...appState };
@@ -216,7 +216,7 @@ const ImageInterpolation: React.FC<ImageInterpolationProps> = (props) => {
             const resultUrl = await editImageWithPrompt(
                 appState.generatedImage,
                 prompt,
-                appState.options.aspectRatio,
+                aspectRatio,
                 appState.options.removeWatermark
             );
             

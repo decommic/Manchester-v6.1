@@ -248,7 +248,7 @@ const AvatarCreator: React.FC<AvatarCreatorProps> = (props) => {
         await executeGeneration([t('avatarCreator_randomConcept')]);
     };
 
-    const handleRegenerateIdea = async (idea: string, customPrompt: string) => {
+    const handleRegenerateIdea = async (idea: string, customPrompt: string, aspectRatio: string) => {
         const imageToEditState = appState.generatedImages[idea];
         // FIX: Replaced complex type guard with a simpler, safer check.
         if (!imageToEditState || imageToEditState.status !== 'done' || !imageToEditState.url) {
@@ -264,7 +264,7 @@ const AvatarCreator: React.FC<AvatarCreatorProps> = (props) => {
         });
 
         try {
-            const resultUrl = await editImageWithPrompt(imageUrlToEdit, customPrompt);
+            const resultUrl = await editImageWithPrompt(imageUrlToEdit, customPrompt, aspectRatio, appState.options.removeWatermark);
             const settingsToEmbed = {
                 viewId: 'avatar-creator',
                 state: { ...appState, stage: 'configuring', generatedImages: {}, historicalImages: [], error: null },
@@ -512,7 +512,7 @@ const AvatarCreator: React.FC<AvatarCreatorProps> = (props) => {
                                     mediaUrl={imageState?.url}
                                     error={imageState?.error}
                                     onImageChange={handleGeneratedImageChange(idea)}
-                                    onRegenerate={(prompt) => handleRegenerateIdea(idea, prompt)}
+                                    onRegenerate={(prompt, aspectRatio) => handleRegenerateIdea(idea, prompt, aspectRatio)}
                                     onGenerateVideoFromPrompt={(prompt) => imageState?.url && generateVideo(imageState.url, prompt)}
                                     regenerationTitle={t('common_regenTitle')}
                                     regenerationDescription={t('common_regenDescription')}

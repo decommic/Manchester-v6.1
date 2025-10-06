@@ -4,7 +4,7 @@
 */
 import React, { ChangeEvent, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { generateFreeImage, editImageWithPrompt, analyzePromptForImageGenerationParams, enhancePrompt } from '../services/geminiService';
+import { generateFreeImage, editImageWithPrompt, enhancePrompt } from '../services/geminiService';
 import ActionablePolaroidCard from './ActionablePolaroidCard';
 import Lightbox from './Lightbox';
 import { 
@@ -43,7 +43,6 @@ interface FreeGenerationProps {
     logGeneration: (appId: string, preGenState: any, thumbnailUrl: string) => void;
 }
 
-const NUMBER_OF_IMAGES_OPTIONS = ['1', '2', '3', '4'] as const;
 const ASPECT_RATIO_OPTIONS = ['Giữ nguyên', '1:1', '2:3', '4:5', '9:16', '1:2', '3:2', '5:4', '16:9', '2:1'];
 
 const FreeGeneration: React.FC<FreeGenerationProps> = (props) => {
@@ -153,34 +152,13 @@ const FreeGeneration: React.FC<FreeGenerationProps> = (props) => {
         onStateChange({ ...preGenState, stage: 'generating', error: null, generatedImages: [] });
 
         try {
-            let resultUrls: string[];
-    
-            // Case 1: Text-to-Image (Imagen) with prompt analysis
-            if (!appState.image1) {
-                const params = await analyzePromptForImageGenerationParams(finalPrompt);
-                
-                const numImages = params.numberOfImages > 1 ? params.numberOfImages : appState.options.numberOfImages;
-                const aspectRatio = params.aspectRatio !== '1:1' ? params.aspectRatio : appState.options.aspectRatio;
-
-                resultUrls = await generateFreeImage(
-                    params.refinedPrompt,
-                    numImages,
-                    aspectRatio,
-                    undefined,
-                    undefined,
-                    appState.options.removeWatermark
-                );
-            } else {
-                // Case 2: Image-to-Image (Gemini Image Editing)
-                resultUrls = await generateFreeImage(
-                    finalPrompt, 
-                    1, // Editing always produces 1 image
-                    appState.options.aspectRatio, 
-                    appState.image1, 
-                    appState.image2, 
-                    appState.options.removeWatermark
-                );
-            }
+            const resultUrls = await generateFreeImage(
+                finalPrompt, 
+                appState.options.aspectRatio, 
+                appState.image1, 
+                appState.image2, 
+                appState.options.removeWatermark
+            );
 
             const settingsToEmbed = {
                 viewId: 'free-generation',
@@ -208,7 +186,7 @@ const FreeGeneration: React.FC<FreeGenerationProps> = (props) => {
         }
     };
 
-    const handleRegeneration = async (index: number, prompt: string) => {
+    const handleRegeneration = async (index: number, prompt: string, aspectRatio: string) => {
         const url = appState.generatedImages[index];
         if (!url) return;
         
@@ -218,7 +196,7 @@ const FreeGeneration: React.FC<FreeGenerationProps> = (props) => {
         onStateChange({ ...appState, stage: 'generating', error: null });
 
         try {
-            const resultUrl = await editImageWithPrompt(url, prompt);
+            const resultUrl = await editImageWithPrompt(url, prompt, aspectRatio, appState.options.removeWatermark);
             const settingsToEmbed = {
                 viewId: 'free-generation',
                 state: { ...appState, stage: 'configuring', generatedImages: [], historicalImages: [], error: null },
@@ -366,23 +344,7 @@ const FreeGeneration: React.FC<FreeGenerationProps> = (props) => {
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className={`transition-opacity duration-300 ${appState.image1 ? 'opacity-50' : 'opacity-100'}`}>
-                                <label htmlFor="number-of-images" className="block text-left base-font font-bold text-lg text-neutral-200 mb-2">
-                                    {t('freeGeneration_numImagesLabel')}
-                                </label>
-                                <select
-                                    id="number-of-images"
-                                    value={appState.options.numberOfImages}
-                                    onChange={(e) => handleOptionChange('numberOfImages', parseInt(e.target.value, 10))}
-                                    className="form-input"
-                                    disabled={!!appState.image1}
-                                    aria-label={t('freeGeneration_numImagesAriaLabel')}
-                                >
-                                    {NUMBER_OF_IMAGES_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                </select>
-                                {appState.image1 && <p className="text-xs text-neutral-400 mt-1">{t('freeGeneration_editModeWarning')}</p>}
-                            </div>
+                        <div className="grid grid-cols-1 gap-4">
                              <div>
                                 <label htmlFor="aspect-ratio" className="block text-left base-font font-bold text-lg text-neutral-200 mb-2">{t('common_aspectRatio')}</label>
                                 <select
@@ -461,7 +423,7 @@ const FreeGeneration: React.FC<FreeGenerationProps> = (props) => {
                     )}
                     {
                        isLoading && !isEnhancing ? 
-                        Array.from({ length: appState.image1 ? 1 : appState.options.numberOfImages }).map((_, index) => (
+                        Array.from({ length: appState.image1 ? 1 : 1 }).map((_, index) => (
                              <motion.div
                                 className="w-full md:w-auto flex-shrink-0"
                                 key={`pending-${index}`}
@@ -489,7 +451,7 @@ const FreeGeneration: React.FC<FreeGenerationProps> = (props) => {
                                     mediaUrl={url}
                                     onGenerateVideoFromPrompt={(prompt) => generateVideo(url, prompt)}
                                     onImageChange={handleSaveGeneratedImage(index)}
-                                    onRegenerate={(prompt) => handleRegeneration(index, prompt)}
+                                    onRegenerate={(prompt, aspectRatio) => handleRegeneration(index, prompt, aspectRatio)}
                                     regenerationTitle={t('freeGeneration_regenTitle')}
                                     regenerationDescription={t('freeGeneration_regenDescription')}
                                     regenerationPlaceholder={t('freeGeneration_regenPlaceholder')}

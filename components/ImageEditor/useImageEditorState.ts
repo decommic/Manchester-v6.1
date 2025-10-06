@@ -442,6 +442,560 @@ export const useImageEditorState = (
         }
     }, [rotation, flipHorizontal, flipVertical, applyPixelAdjustments, blur, isSelectionActive, selectionPath, isShowingOriginal, featherAmount]);
 
+    // FIX: Hoist function definitions to be before they are referenced.
+    // --- Action Handlers ---
+    const getFinalImage = useCallback((): Promise<string | null> => {
+        return new Promise((resolve, reject) => {
+            if (!sourceImageRef.current || !drawingCanvasRef.current) {
+                resolve(null);
+                return;
+            }
+            
+            setTimeout(() => {
+                try {
+                    const image = sourceImageRef.current!;
+                    const drawingCanvas = drawingCanvasRef.current!;
+
+                    const isSwapped = rotation === 90 || rotation === 270;
+                    const finalCanvas = document.createElement('canvas');
+                    finalCanvas.width = isSwapped ? image.naturalHeight : image.naturalWidth;
+                    finalCanvas.height = isSwapped ? image.naturalWidth : image.naturalHeight;
+                    const finalCtx = finalCanvas.getContext('2d');
+                    if (!finalCtx) throw new Error("Could not get final canvas context");
+
+                    // 1. Draw transformed source image
+                    const drawWidth = isSwapped ? finalCanvas.height : finalCanvas.width;
+                    const drawHeight = isSwapped ? finalCanvas.width : finalCanvas.height;
+                    finalCtx.save();
+                    finalCtx.translate(finalCanvas.width / 2, finalCanvas.height / 2);
+                    finalCtx.rotate(rotation * Math.PI / 180);
+                    finalCtx.scale(flipHorizontal ? -1 : 1, flipVertical ? -1 : 1);
+                    finalCtx.drawImage(image, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+                    finalCtx.restore();
+
+                    // 2. Apply pixel adjustments (filters) to the full-res canvas
+                    // We pass ignoreSelection: true because saving applies to the whole image.
+                    applyPixelAdjustments(finalCtx, finalCanvas.width, finalCanvas.height, { ignoreSelection: true });
+
+                    // 3. Apply blur effect
+                    if (blur > 0) {
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = finalCanvas.width;
+                        tempCanvas.height = finalCanvas.height;
+                        const tempCtx = tempCanvas.getContext('2d');
+                        if (!tempCtx) throw new Error("Could not get temp canvas context for blur");
+                        tempCtx.drawImage(finalCanvas, 0, 0);
+                        finalCtx.clearRect(0, 0, finalCanvas.width, finalCanvas.height);
+                        finalCtx.filter = `blur(${blur}px)`;
+                        finalCtx.drawImage(tempCanvas, 0, 0);
+                        finalCtx.filter = 'none';
+                    }
+
+                    // 4. Draw brush strokes, scaled up
+                    const drawScaleX = finalCanvas.width / drawingCanvas.width;
+                    const drawScaleY = finalCanvas.height / drawingCanvas.height;
+                    finalCtx.save();
+                    finalCtx.scale(drawScaleX, drawScaleY);
+                    finalCtx.drawImage(drawingCanvas, 0, 0);
+                    finalCtx.restore();
+
+                    // 5. Resolve with high-quality PNG
+                    resolve(finalCanvas.toDataURL('image/png'));
+                } catch (error) {
+                    console.error("Error creating final image:", error);
+                    reject(error);
+                }
+            }, 50);
+        });
+    }, [
+        rotation, flipHorizontal, flipVertical, applyPixelAdjustments, blur,
+        luminance, contrast, temp, tint, saturation, vibrance, hue, colorAdjustments, grain, clarity, dehaze, isInverted
+    ]);
+
+    const handleApplyAdjustmentsToSelection = useCallback(() => {
+        if (!isSelectionActive || !selectionPath || !previewCanvasRef.current || !drawingCanvasRef.current || !sourceImageRef.current) return;
+        setIsProcessing(true);
+        setTimeout(() => {
+            try {
+                const previewCanvas = previewCanvasRef.current!;
+                const drawingCanvas = drawingCanvasRef.current!;
+                const sourceImage = sourceImageRef.current!;
+                const bakeCanvas = document.createElement('canvas');
+                bakeCanvas.width = previewCanvas.width;
+                bakeCanvas.height = previewCanvas.height;
+                const bakeCtx = bakeCanvas.getContext('2d');
+                if (!bakeCtx) throw new Error("Could not create bake canvas context");
+
+                // 1. Draw the "before" state (current image ONLY).
+                bakeCtx.save();
+                bakeCtx.translate(bakeCanvas.width / 2, bakeCanvas.height / 2);
+                bakeCtx.rotate(rotation * Math.PI / 180);
+                bakeCtx.scale(flipHorizontal ? -1 : 1, flipVertical ? -1 : 1);
+                const isSwapped = rotation === 90 || rotation === 270;
+                const drawWidth = isSwapped ? bakeCanvas.height : bakeCanvas.width;
+                const drawHeight = isSwapped ? bakeCanvas.width : bakeCanvas.height;
+                bakeCtx.drawImage(sourceImage, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+                bakeCtx.restore();
+
+                // 2. Create the feathered mask.
+                const maskCanvas = createFeatheredMask(selectionPath, bakeCanvas.width, bakeCanvas.height, featherAmount);
+
+                // 3. Create a temporary canvas for the "after" state (the adjusted image).
+                const adjustedLayerCanvas = document.createElement('canvas');
+                adjustedLayerCanvas.width = bakeCanvas.width;
+                adjustedLayerCanvas.height = bakeCanvas.height;
+                const adjustedLayerCtx = adjustedLayerCanvas.getContext('2d');
+                if (!adjustedLayerCtx) throw new Error("Could not create adjusted layer context");
+
+                // 4. Draw ONLY the adjusted image (from the live preview) onto this temporary layer.
+                adjustedLayerCtx.drawImage(previewCanvas, 0, 0);
+
+                // 5. Use the mask to "cut out" the adjusted parts.
+                adjustedLayerCtx.globalCompositeOperation = 'destination-in';
+                adjustedLayerCtx.drawImage(maskCanvas, 0, 0);
+
+                // 6. Draw the masked adjusted layer on top of the "before" state.
+                bakeCtx.drawImage(adjustedLayerCanvas, 0, 0);
+                
+                // 7. NOW, draw the drawing canvas on top of the composited result.
+                bakeCtx.drawImage(drawingCanvas, 0, 0);
+                
+                const newDataUrl = bakeCanvas.toDataURL('image/png');
+    
+                const resetAndBake = () => {
+                    setLuminance(0); setContrast(0); setTemp(0); setTint(0); setSaturation(0); setVibrance(0); setHue(0);
+                    setGrain(0); setClarity(0); setDehaze(0); setBlur(0); setColorAdjustments(INITIAL_COLOR_ADJUSTMENTS);
+                    setRotation(0); setFlipHorizontal(false); setFlipVertical(false); setIsInverted(false);
+                    if (drawingCanvasRef.current) {
+                        drawingCanvasRef.current.getContext('2d')?.clearRect(0, 0, drawingCanvasRef.current.width, drawingCanvasRef.current.height);
+                    }
+                    setInternalImageUrl(newDataUrl);
+                    const bakedState: EditorStateSnapshot = {
+                        imageUrl: newDataUrl, luminance: 0, contrast: 0, temp: 0, tint: 0, saturation: 0, vibrance: 0, hue: 0,
+                        grain: 0, clarity: 0, dehaze: 0, blur: 0, rotation: 0, flipHorizontal: false, flipVertical: false, isInverted: false,
+                        brushHardness: brushHardness, brushOpacity: brushOpacity, colorAdjustments: INITIAL_COLOR_ADJUSTMENTS, drawingCanvasDataUrl: null,
+                    };
+                    pushHistory(bakedState);
+                };
+    
+                const newImage = new Image();
+                newImage.onload = () => requestAnimationFrame(resetAndBake);
+                newImage.src = newDataUrl;
+            } catch (error) {
+                console.error("Error applying adjustments to selection:", error);
+            } finally {
+                setIsProcessing(false);
+            }
+        }, 50);
+    }, [isSelectionActive, selectionPath, previewCanvasRef, drawingCanvasRef, sourceImageRef, rotation, flipHorizontal, flipVertical, pushHistory, brushHardness, brushOpacity, featherAmount]);
+    
+    const handleApplyAllAdjustments = useCallback(() => {
+        if (!internalImageUrl || !sourceImageRef.current || !previewCanvasRef.current || !drawingCanvasRef.current) return;
+        setIsProcessing(true);
+        setTimeout(() => {
+            try {
+                const image = sourceImageRef.current!;
+                const previewCanvas = previewCanvasRef.current!;
+                const drawingCanvas = drawingCanvasRef.current!;
+                let sourceForFinal: HTMLCanvasElement | HTMLImageElement = image;
+                let finalWidth = image.naturalWidth;
+                let finalHeight = image.naturalHeight;
+                if (cropSelection && cropSelection.width > 1 && cropSelection.height > 1) {
+                    const scaleX = image.naturalWidth / previewCanvas.width;
+                    const scaleY = image.naturalHeight / previewCanvas.height;
+                    const sx = cropSelection.x * scaleX; const sy = cropSelection.y * scaleY;
+                    const sWidth = cropSelection.width * scaleX; const sHeight = cropSelection.height * scaleY;
+                    const cropCanvas = document.createElement('canvas');
+                    cropCanvas.width = sWidth; cropCanvas.height = sHeight;
+                    const cropCtx = cropCanvas.getContext('2d');
+                    if (!cropCtx) throw new Error("Could not get crop canvas context");
+                    cropCtx.drawImage(image, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
+                    sourceForFinal = cropCanvas;
+                    finalWidth = sWidth;
+                    finalHeight = sHeight;
+                }
+                const isSwapped = rotation === 90 || rotation === 270;
+                const finalCanvas = document.createElement('canvas');
+                finalCanvas.width = isSwapped ? finalHeight : finalWidth;
+                finalCanvas.height = isSwapped ? finalWidth : finalHeight;
+                const finalCtx = finalCanvas.getContext('2d');
+                if (!finalCtx) throw new Error("Could not get final canvas context");
+                finalCtx.save();
+                finalCtx.translate(finalCanvas.width / 2, finalCanvas.height / 2);
+                finalCtx.rotate(rotation * Math.PI / 180);
+                finalCtx.scale(flipHorizontal ? -1 : 1, flipVertical ? -1 : 1);
+                finalCtx.drawImage(sourceForFinal, -finalWidth / 2, -finalHeight / 2, finalWidth, finalHeight);
+                finalCtx.restore();
+                applyPixelAdjustments(finalCtx, finalCanvas.width, finalCanvas.height, { ignoreSelection: true });
+                if (blur > 0) {
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = finalCanvas.width;
+                    tempCanvas.height = finalCanvas.height;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    if(!tempCtx) throw new Error("Could not get temp canvas context for blur");
+                    tempCtx.drawImage(finalCanvas, 0, 0);
+                    finalCtx.clearRect(0,0,finalCanvas.width, finalCanvas.height);
+                    finalCtx.filter = `blur(${blur}px)`;
+                    finalCtx.drawImage(tempCanvas, 0, 0);
+                    finalCtx.filter = 'none';
+                }
+                const drawScaleX = finalCanvas.width / drawingCanvas.width;
+                const drawScaleY = finalCanvas.height / drawingCanvas.height;
+                finalCtx.save();
+                finalCtx.scale(drawScaleX, drawScaleY);
+                finalCtx.drawImage(drawingCanvas, 0, 0);
+                finalCtx.restore();
+                const newDataUrl = finalCanvas.toDataURL('image/png');
+                const resetAndApply = () => {
+                    setLuminance(0); setContrast(0); setTemp(0); setTint(0); setSaturation(0); setVibrance(0); setHue(0);
+                    setGrain(0); setClarity(0); setDehaze(0); setBlur(0); setColorAdjustments(INITIAL_COLOR_ADJUSTMENTS);
+                    setRotation(0); setFlipHorizontal(false); setFlipVertical(false); setIsInverted(false);
+                    setCropSelection(null); setActiveTool(null); deselect();
+                    if (drawingCanvasRef.current) {
+                        drawingCanvasRef.current.getContext('2d')?.clearRect(0, 0, drawingCanvasRef.current.width, drawingCanvasRef.current.height);
+                    }
+                    setInternalImageUrl(newDataUrl);
+                    const appliedState: EditorStateSnapshot = {
+                        imageUrl: newDataUrl, luminance: 0, contrast: 0, temp: 0, tint: 0, saturation: 0, vibrance: 0, hue: 0,
+                        grain: 0, clarity: 0, dehaze: 0, blur: 0, rotation: 0, flipHorizontal: false, flipVertical: false, isInverted: false,
+                        brushHardness: brushHardness, brushOpacity: brushOpacity, colorAdjustments: INITIAL_COLOR_ADJUSTMENTS, drawingCanvasDataUrl: null,
+                    };
+                    pushHistory(appliedState);
+                };
+    
+                const newImage = new Image();
+                newImage.onload = () => requestAnimationFrame(resetAndApply);
+                newImage.src = newDataUrl;
+            } catch (error) {
+                console.error("Error applying adjustments:", error);
+                alert("An error occurred while applying adjustments.");
+            } finally {
+                setIsProcessing(false);
+            }
+        }, 50);
+    }, [ internalImageUrl, sourceImageRef, previewCanvasRef, drawingCanvasRef, cropSelection, rotation, flipHorizontal, flipVertical, blur, applyPixelAdjustments, pushHistory, deselect, brushHardness, brushOpacity ]);
+    
+    const handleCancelPerspectiveCrop = useCallback(() => {
+        setPerspectiveCropPoints([]);
+        setActiveTool(null);
+        setHoveredPerspectiveHandleIndex(null);
+        setInteractionState('none');
+    }, []);
+
+    const handleApplyPerspectiveCrop = useCallback(() => {
+        if (perspectiveCropPoints.length !== 4 || !sourceImageRef.current || !previewCanvasRef.current) return;
+        commitState();
+    
+        const image = sourceImageRef.current;
+        const previewCanvas = previewCanvasRef.current;
+        const scaleX = image.naturalWidth / previewCanvas.width;
+        const scaleY = image.naturalHeight / previewCanvas.height;
+    
+        const srcPoints = perspectiveCropPoints.map(p => ({ x: p.x * scaleX, y: p.y * scaleY }));
+        
+        const [tl, tr, br, bl] = srcPoints;
+    
+        const widthA = Math.hypot(br.x - bl.x, br.y - bl.y);
+        const widthB = Math.hypot(tr.x - tl.x, tr.y - tl.y);
+        const destWidth = Math.max(widthA, widthB);
+    
+        const heightA = Math.hypot(tr.x - br.x, tr.y - br.y);
+        const heightB = Math.hypot(tl.x - bl.x, tl.y - bl.y);
+        const destHeight = Math.max(heightA, heightB);
+    
+        const destPoints: [Point, Point, Point, Point] = [
+            { x: 0, y: 0 },
+            { x: destWidth, y: 0 },
+            { x: destWidth, y: destHeight },
+            { x: 0, y: destHeight }
+        ];
+    
+        const transform = getPerspectiveTransform(srcPoints, destPoints);
+        if (!transform) {
+            alert("Could not apply perspective crop. The points might not form a valid quadrilateral.");
+            return;
+        }
+    
+        const cropCanvas = document.createElement('canvas');
+        cropCanvas.width = Math.round(destWidth);
+        cropCanvas.height = Math.round(destHeight);
+        
+        warpPerspective(image, cropCanvas, transform);
+    
+        const newDataUrl = cropCanvas.toDataURL('image/png');
+        
+        const postCropState: EditorStateSnapshot = {
+            imageUrl: newDataUrl,
+            luminance: 0, contrast: 0, temp: 0, tint: 0, saturation: 0, vibrance: 0, hue: 0,
+            grain: 0, clarity: 0, dehaze: 0, blur: 0,
+            rotation: 0, flipHorizontal: false, flipVertical: false, isInverted: false,
+            brushHardness: brushHardness, brushOpacity: brushOpacity,
+            colorAdjustments: INITIAL_COLOR_ADJUSTMENTS, drawingCanvasDataUrl: null,
+        };
+    
+        pushHistory(postCropState);
+        restoreState(postCropState);
+        handleCancelPerspectiveCrop();
+    
+    }, [perspectiveCropPoints, commitState, handleCancelPerspectiveCrop, pushHistory, restoreState, brushHardness, brushOpacity]);
+
+    const handleToolSelect = useCallback((tool: Tool) => {
+        if (activeTool === 'pen' && tool !== 'pen') {
+            setPenPathPoints([]);
+            setCurrentPenDrag(null);
+        }
+        if (tool === 'perspective-crop') {
+            setInteractionState('placingPerspectivePoints');
+            setPerspectiveCropPoints([]); // Reset points on tool selection
+        }
+        setActiveTool(prev => (prev === tool ? null : tool));
+    }, [activeTool]);
+    const handleCancelCrop = useCallback(() => { setCropSelection(null); setActiveTool(null); }, []);
+    const handleApplyCrop = useCallback(() => {
+        if (!cropSelection || !sourceImageRef.current || !previewCanvasRef.current) return;
+        commitState();
+        const image = sourceImageRef.current; const previewCanvas = previewCanvasRef.current;
+        if (cropSelection.width < 1 || cropSelection.height < 1) { handleCancelCrop(); return; }
+        const scaleX = image.naturalWidth / previewCanvas.width; const scaleY = image.naturalHeight / previewCanvas.height;
+        const sx = cropSelection.x * scaleX; const sy = cropSelection.y * scaleY;
+        const sWidth = cropSelection.width * scaleX; const sHeight = cropSelection.height * scaleY;
+        const cropCanvas = document.createElement('canvas');
+        cropCanvas.width = sWidth; cropCanvas.height = sHeight;
+        const cropCtx = cropCanvas.getContext('2d'); if (!cropCtx) return;
+        cropCtx.drawImage(image, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
+        const newDataUrl = cropCanvas.toDataURL('image/png');
+        const postCropState: EditorStateSnapshot = { imageUrl: newDataUrl, luminance: 0, contrast: 0, temp: 0, tint: 0, saturation: 0, vibrance: 0, hue: 0, grain: 0, clarity: 0, dehaze: 0, blur: 0, rotation: 0, flipHorizontal: false, flipVertical: false, isInverted: false, brushHardness: brushHardness, brushOpacity: brushOpacity, colorAdjustments: INITIAL_COLOR_ADJUSTMENTS, drawingCanvasDataUrl: null, };
+        pushHistory(postCropState);
+        restoreState(postCropState); setCropSelection(null); setActiveTool(null);
+    }, [cropSelection, commitState, handleCancelCrop, pushHistory, restoreState, brushHardness, brushOpacity]);
+    
+    const deleteImageContentInSelection = useCallback(() => {
+        if (!selectionPath || !previewCanvasRef.current || !drawingCanvasRef.current) return;
+        setIsProcessing(true);
+        setTimeout(() => {
+            try {
+                const previewCanvas = previewCanvasRef.current!;
+                const drawingCanvas = drawingCanvasRef.current!;
+                const combinedCanvas = document.createElement('canvas');
+                combinedCanvas.width = previewCanvas.width;
+                combinedCanvas.height = previewCanvas.height;
+                const ctx = combinedCanvas.getContext('2d');
+                if (!ctx) throw new Error("Could not create combined canvas context");
+                ctx.drawImage(previewCanvas, 0, 0);
+                ctx.drawImage(drawingCanvas, 0, 0);
+
+                const maskCanvas = createFeatheredMask(selectionPath!, combinedCanvas.width, combinedCanvas.height, featherAmount);
+                
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.drawImage(maskCanvas, 0, 0);
+
+                const newDataUrl = combinedCanvas.toDataURL('image/png');
+                const bakedState: EditorStateSnapshot = { imageUrl: newDataUrl, luminance: 0, contrast: 0, temp: 0, tint: 0, saturation: 0, vibrance: 0, hue: 0, grain: 0, clarity: 0, dehaze: 0, blur: 0, rotation: 0, flipHorizontal: false, flipVertical: false, isInverted: false, brushHardness: brushHardness, brushOpacity: brushOpacity, colorAdjustments: INITIAL_COLOR_ADJUSTMENTS, drawingCanvasDataUrl: null, };
+                pushHistory(bakedState); restoreState(bakedState); deselect();
+            } catch (error) { console.error("Error deleting content:", error); alert("An error occurred while deleting the selected content."); } 
+            finally { setIsProcessing(false); }
+        }, 50);
+    }, [selectionPath, featherAmount, pushHistory, restoreState, deselect, previewCanvasRef, drawingCanvasRef, brushHardness, brushOpacity]);
+    
+    const fillSelection = useCallback(() => {
+        if (!selectionPath || !drawingCanvasRef.current) return;
+        const ctx = drawingCanvasRef.current.getContext('2d'); if (!ctx) return;
+        
+        const maskCanvas = createFeatheredMask(selectionPath, drawingCanvasRef.current.width, drawingCanvasRef.current.height, featherAmount);
+        
+        const fillCanvas = document.createElement('canvas');
+        fillCanvas.width = drawingCanvasRef.current.width;
+        fillCanvas.height = drawingCanvasRef.current.height;
+        const fillCtx = fillCanvas.getContext('2d');
+        if (fillCtx) {
+            fillCtx.fillStyle = brushColor;
+            fillCtx.fillRect(0, 0, fillCanvas.width, fillCanvas.height);
+            fillCtx.globalCompositeOperation = 'destination-in';
+            fillCtx.drawImage(maskCanvas, 0, 0);
+        }
+        
+        ctx.save();
+        ctx.globalAlpha = brushOpacity / 100;
+        ctx.drawImage(fillCanvas, 0, 0);
+        ctx.restore();
+        commitState();
+    }, [selectionPath, brushColor, brushOpacity, featherAmount, commitState]);
+
+    const invertSelection = useCallback(() => setIsSelectionInverted(prev => !prev), []);
+    
+    const handleCreateBlank = useCallback(() => {
+        const createBlankCanvasDataUrl = (width: number, height: number, color: string): string => {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.fillStyle = color;
+                ctx.fillRect(0, 0, width, height);
+            }
+            return canvas.toDataURL('image/png');
+        };
+        const newUrl = createBlankCanvasDataUrl(2000, 2000, '#FFFFFF');
+        setupNewImage(newUrl);
+    }, [setupNewImage]);
+
+    const handleAiEdit = useCallback(async () => {
+        if (!aiEditPrompt.trim() || !internalImageUrl) return;
+        setIsLoading(true);
+
+        try {
+            let imageToSendUrl: string;
+            let promptToSend = aiEditPrompt;
+
+            const currentImageAsUrl = await getFinalImage();
+            if (!currentImageAsUrl) throw new Error("Could not get current image data.");
+
+            if (isSelectionActive && selectionPath) {
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                const img = new Image();
+
+                await new Promise<void>((resolve, reject) => {
+                    img.onload = () => resolve();
+                    img.onerror = (err) => reject(new Error("Failed to load image for masking."));
+                    img.src = currentImageAsUrl;
+                });
+                
+                tempCanvas.width = img.naturalWidth;
+                tempCanvas.height = img.naturalHeight;
+                if (!tempCtx) throw new Error("Could not get temp canvas context");
+
+                tempCtx.drawImage(img, 0, 0);
+
+                const previewCanvas = previewCanvasRef.current;
+                if (!previewCanvas) throw new Error("Preview canvas not found");
+                const scaleX = img.naturalWidth / previewCanvas.width;
+                const scaleY = img.naturalHeight / previewCanvas.height;
+                
+                tempCtx.save();
+                tempCtx.scale(scaleX, scaleY);
+                tempCtx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                tempCtx.fill(selectionPath);
+                tempCtx.restore();
+
+                imageToSendUrl = tempCanvas.toDataURL('image/png');
+                promptToSend = `${aiEditPrompt}. **HƯỚNG DẪN DÀNH CHO AI:** Vùng được tô màu đỏ mờ trên ảnh là khu vực duy nhất bạn được phép chỉnh sửa. Vùng màu đỏ này chỉ là một MẶT NẠ (MASK) để chỉ định khu vực, không phải là một phần của ảnh. **YÊU CẦU QUAN TRỌNG NHẤT:** Kết quả cuối cùng TUYỆT ĐỐI không được chứa bất kỳ vùng màu đỏ mờ nào.`;
+
+            } else {
+                imageToSendUrl = currentImageAsUrl;
+            }
+
+            const resultUrl = await editImageWithPrompt(imageToSendUrl, promptToSend);
+            
+            const resetAndApply = () => {
+                setLuminance(0); setContrast(0); setTemp(0); setTint(0); setSaturation(0); setVibrance(0); setHue(0);
+                setGrain(0); setClarity(0); setDehaze(0); setBlur(0); setColorAdjustments(INITIAL_COLOR_ADJUSTMENTS);
+                setRotation(0); setFlipHorizontal(false); setFlipVertical(false); setIsInverted(false);
+                setCropSelection(null); 
+                deselect();
+                if (drawingCanvasRef.current) {
+                    drawingCanvasRef.current.getContext('2d')?.clearRect(0, 0, drawingCanvasRef.current.width, drawingCanvasRef.current.height);
+                }
+                setInternalImageUrl(resultUrl);
+                const appliedState: EditorStateSnapshot = {
+                    imageUrl: resultUrl, luminance: 0, contrast: 0, temp: 0, tint: 0, saturation: 0, vibrance: 0, hue: 0,
+                    grain: 0, clarity: 0, dehaze: 0, blur: 0, rotation: 0, flipHorizontal: false, flipVertical: false, isInverted: false,
+                    brushHardness: 50, brushOpacity: 50,
+                    colorAdjustments: INITIAL_COLOR_ADJUSTMENTS, drawingCanvasDataUrl: null,
+                };
+                pushHistory(appliedState);
+                setAiEditPrompt('');
+            };
+
+            const newImage = new Image();
+            newImage.crossOrigin = "anonymous";
+            newImage.onload = () => requestAnimationFrame(resetAndApply);
+            newImage.src = resultUrl;
+
+        } catch (err) {
+            alert(`Lỗi với Chỉnh sửa AI: ${err instanceof Error ? err.message : "Đã xảy ra lỗi không xác định."}`);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [aiEditPrompt, internalImageUrl, getFinalImage, isSelectionActive, selectionPath, previewCanvasRef, pushHistory, deselect]);
+    
+    const handleSave = useCallback(async () => {
+        if (!imageToEdit) return;
+        setIsProcessing(true);
+        try {
+            const finalUrl = await getFinalImage();
+            if (finalUrl) {
+                imageToEdit.onSave(finalUrl);
+            }
+        } catch (err) {
+            console.error("Error saving image:", err);
+            alert("An error occurred while saving the image.");
+        } finally {
+            setIsProcessing(false);
+        }
+    }, [getFinalImage, imageToEdit]);
+
+    const handleRotateCanvas = useCallback(async () => {
+        if (!internalImageUrl) return;
+        setIsProcessing(true);
+        try {
+            const currentImageAsUrl = await getFinalImage();
+            if (!currentImageAsUrl) throw new Error("Could not get current image data.");
+    
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            
+            const newDataUrl = await new Promise<string>((resolve, reject) => {
+                img.onload = () => {
+                    const rotateCanvas = document.createElement('canvas');
+                    rotateCanvas.width = img.height;
+                    rotateCanvas.height = img.width;
+                    const rotateCtx = rotateCanvas.getContext('2d');
+                    if (!rotateCtx) {
+                        reject(new Error("Could not create rotate canvas context"));
+                        return;
+                    }
+    
+                    rotateCtx.translate(rotateCanvas.width / 2, rotateCanvas.height / 2);
+                    rotateCtx.rotate(90 * Math.PI / 180);
+                    rotateCtx.drawImage(img, -img.width / 2, -img.height / 2);
+                    
+                    resolve(rotateCanvas.toDataURL('image/png'));
+                };
+                img.onerror = reject;
+                img.src = currentImageAsUrl;
+            });
+    
+            const postRotateState: EditorStateSnapshot = {
+                imageUrl: newDataUrl,
+                luminance: 0, contrast: 0, temp: 0, tint: 0, saturation: 0, vibrance: 0, hue: 0,
+                grain: 0, clarity: 0, dehaze: 0, blur: 0,
+                rotation: 0, 
+                flipHorizontal: false, flipVertical: false, isInverted: false,
+                brushHardness: brushHardness,
+                brushOpacity: brushOpacity,
+                colorAdjustments: INITIAL_COLOR_ADJUSTMENTS,
+                drawingCanvasDataUrl: null, 
+            };
+            
+            pushHistory(postRotateState);
+            restoreState(postRotateState);
+            
+            if (drawingCanvasRef.current) {
+                drawingCanvasRef.current.getContext('2d')?.clearRect(0, 0, drawingCanvasRef.current.width, drawingCanvasRef.current.height);
+            }
+    
+        } catch (err) {
+            console.error("Error during canvas rotation:", err);
+            alert("An error occurred while rotating the image.");
+        } finally {
+            setIsProcessing(false);
+        }
+    }, [internalImageUrl, getFinalImage, pushHistory, restoreState, brushHardness, brushOpacity, drawingCanvasRef]);
+
+    const handleUndo = useCallback(() => { if (historyIndex > 0) { const newIndex = historyIndex - 1; setHistoryIndex(newIndex); restoreState(history[newIndex]); } }, [history, historyIndex, restoreState]);
+    const handleRedo = useCallback(() => { if (historyIndex < history.length - 1) { const newIndex = historyIndex + 1; setHistoryIndex(newIndex); restoreState(history[newIndex]); } }, [history, historyIndex, restoreState]);
+
     useEffect(() => {
         if(drawAdjustedImageRef) {
             drawAdjustedImageRef.current = drawAdjustedImage;
@@ -845,8 +1399,6 @@ export const useImageEditorState = (
     };
     
     // --- Lifecycle & Side Effects ---
-    const handleUndo = useCallback(() => { if (historyIndex > 0) { const newIndex = historyIndex - 1; setHistoryIndex(newIndex); restoreState(history[newIndex]); } }, [history, historyIndex, restoreState]);
-    const handleRedo = useCallback(() => { if (historyIndex < history.length - 1) { const newIndex = historyIndex + 1; setHistoryIndex(newIndex); restoreState(history[newIndex]); } }, [history, historyIndex, restoreState]);
     
     useEffect(() => {
         if (isOpen) {
@@ -915,556 +1467,6 @@ export const useImageEditorState = (
         }
         return () => { if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current) };
     }, [drawAdjustedImage, canvasDimensions]);
-
-    const getFinalImage = useCallback((): Promise<string | null> => {
-        return new Promise((resolve, reject) => {
-            if (!sourceImageRef.current || !drawingCanvasRef.current) {
-                resolve(null);
-                return;
-            }
-            
-            setTimeout(() => {
-                try {
-                    const image = sourceImageRef.current!;
-                    const drawingCanvas = drawingCanvasRef.current!;
-
-                    const isSwapped = rotation === 90 || rotation === 270;
-                    const finalCanvas = document.createElement('canvas');
-                    finalCanvas.width = isSwapped ? image.naturalHeight : image.naturalWidth;
-                    finalCanvas.height = isSwapped ? image.naturalWidth : image.naturalHeight;
-                    const finalCtx = finalCanvas.getContext('2d');
-                    if (!finalCtx) throw new Error("Could not get final canvas context");
-
-                    // 1. Draw transformed source image
-                    const drawWidth = isSwapped ? finalCanvas.height : finalCanvas.width;
-                    const drawHeight = isSwapped ? finalCanvas.width : finalCanvas.height;
-                    finalCtx.save();
-                    finalCtx.translate(finalCanvas.width / 2, finalCanvas.height / 2);
-                    finalCtx.rotate(rotation * Math.PI / 180);
-                    finalCtx.scale(flipHorizontal ? -1 : 1, flipVertical ? -1 : 1);
-                    finalCtx.drawImage(image, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
-                    finalCtx.restore();
-
-                    // 2. Apply pixel adjustments (filters) to the full-res canvas
-                    // We pass ignoreSelection: true because saving applies to the whole image.
-                    applyPixelAdjustments(finalCtx, finalCanvas.width, finalCanvas.height, { ignoreSelection: true });
-
-                    // 3. Apply blur effect
-                    if (blur > 0) {
-                        const tempCanvas = document.createElement('canvas');
-                        tempCanvas.width = finalCanvas.width;
-                        tempCanvas.height = finalCanvas.height;
-                        const tempCtx = tempCanvas.getContext('2d');
-                        if (!tempCtx) throw new Error("Could not get temp canvas context for blur");
-                        tempCtx.drawImage(finalCanvas, 0, 0);
-                        finalCtx.clearRect(0, 0, finalCanvas.width, finalCanvas.height);
-                        finalCtx.filter = `blur(${blur}px)`;
-                        finalCtx.drawImage(tempCanvas, 0, 0);
-                        finalCtx.filter = 'none';
-                    }
-
-                    // 4. Draw brush strokes, scaled up
-                    const drawScaleX = finalCanvas.width / drawingCanvas.width;
-                    const drawScaleY = finalCanvas.height / drawingCanvas.height;
-                    finalCtx.save();
-                    finalCtx.scale(drawScaleX, drawScaleY);
-                    finalCtx.drawImage(drawingCanvas, 0, 0);
-                    finalCtx.restore();
-
-                    // 5. Resolve with high-quality PNG
-                    resolve(finalCanvas.toDataURL('image/png'));
-                } catch (error) {
-                    console.error("Error creating final image:", error);
-                    reject(error);
-                }
-            }, 50);
-        });
-    }, [
-        rotation, flipHorizontal, flipVertical, applyPixelAdjustments, blur,
-        luminance, contrast, temp, tint, saturation, vibrance, hue, colorAdjustments, grain, clarity, dehaze, isInverted
-    ]);
-    
-    // --- More Logic (Shortcuts, Actions) ---
-    const handleCancelPerspectiveCrop = useCallback(() => {
-        setPerspectiveCropPoints([]);
-        setActiveTool(null);
-        setHoveredPerspectiveHandleIndex(null);
-        setInteractionState('none');
-    }, []);
-
-    const handleApplyPerspectiveCrop = useCallback(() => {
-        if (perspectiveCropPoints.length !== 4 || !sourceImageRef.current || !previewCanvasRef.current) return;
-        commitState();
-    
-        const image = sourceImageRef.current;
-        const previewCanvas = previewCanvasRef.current;
-        const scaleX = image.naturalWidth / previewCanvas.width;
-        const scaleY = image.naturalHeight / previewCanvas.height;
-    
-        const srcPoints = perspectiveCropPoints.map(p => ({ x: p.x * scaleX, y: p.y * scaleY }));
-        
-        const [tl, tr, br, bl] = srcPoints;
-    
-        const widthA = Math.hypot(br.x - bl.x, br.y - bl.y);
-        const widthB = Math.hypot(tr.x - tl.x, tr.y - tl.y);
-        const destWidth = Math.max(widthA, widthB);
-    
-        const heightA = Math.hypot(tr.x - br.x, tr.y - br.y);
-        const heightB = Math.hypot(tl.x - bl.x, tl.y - bl.y);
-        const destHeight = Math.max(heightA, heightB);
-    
-        const destPoints: [Point, Point, Point, Point] = [
-            { x: 0, y: 0 },
-            { x: destWidth, y: 0 },
-            { x: destWidth, y: destHeight },
-            { x: 0, y: destHeight }
-        ];
-    
-        const transform = getPerspectiveTransform(srcPoints, destPoints);
-        if (!transform) {
-            alert("Could not apply perspective crop. The points might not form a valid quadrilateral.");
-            return;
-        }
-    
-        const cropCanvas = document.createElement('canvas');
-        cropCanvas.width = Math.round(destWidth);
-        cropCanvas.height = Math.round(destHeight);
-        
-        warpPerspective(image, cropCanvas, transform);
-    
-        const newDataUrl = cropCanvas.toDataURL('image/png');
-        
-        const postCropState: EditorStateSnapshot = {
-            imageUrl: newDataUrl,
-            luminance: 0, contrast: 0, temp: 0, tint: 0, saturation: 0, vibrance: 0, hue: 0,
-            grain: 0, clarity: 0, dehaze: 0, blur: 0,
-            rotation: 0, flipHorizontal: false, flipVertical: false, isInverted: false,
-            brushHardness: brushHardness, brushOpacity: brushOpacity,
-            colorAdjustments: INITIAL_COLOR_ADJUSTMENTS, drawingCanvasDataUrl: null,
-        };
-    
-        pushHistory(postCropState);
-        restoreState(postCropState);
-        handleCancelPerspectiveCrop();
-    
-    }, [perspectiveCropPoints, commitState, handleCancelPerspectiveCrop, pushHistory, restoreState, brushHardness, brushOpacity]);
-
-    const handleApplyAllAdjustments = useCallback(() => {
-        if (!internalImageUrl || !sourceImageRef.current || !previewCanvasRef.current || !drawingCanvasRef.current) return;
-        setIsProcessing(true);
-        setTimeout(() => {
-            try {
-                const image = sourceImageRef.current!;
-                const previewCanvas = previewCanvasRef.current!;
-                const drawingCanvas = drawingCanvasRef.current!;
-                let sourceForFinal: HTMLCanvasElement | HTMLImageElement = image;
-                let finalWidth = image.naturalWidth;
-                let finalHeight = image.naturalHeight;
-                if (cropSelection && cropSelection.width > 1 && cropSelection.height > 1) {
-                    const scaleX = image.naturalWidth / previewCanvas.width;
-                    const scaleY = image.naturalHeight / previewCanvas.height;
-                    const sx = cropSelection.x * scaleX; const sy = cropSelection.y * scaleY;
-                    const sWidth = cropSelection.width * scaleX; const sHeight = cropSelection.height * scaleY;
-                    const cropCanvas = document.createElement('canvas');
-                    cropCanvas.width = sWidth; cropCanvas.height = sHeight;
-                    const cropCtx = cropCanvas.getContext('2d');
-                    if (!cropCtx) throw new Error("Could not get crop canvas context");
-                    cropCtx.drawImage(image, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
-                    sourceForFinal = cropCanvas;
-                    finalWidth = sWidth;
-                    finalHeight = sHeight;
-                }
-                const isSwapped = rotation === 90 || rotation === 270;
-                const finalCanvas = document.createElement('canvas');
-                finalCanvas.width = isSwapped ? finalHeight : finalWidth;
-                finalCanvas.height = isSwapped ? finalWidth : finalHeight;
-                const finalCtx = finalCanvas.getContext('2d');
-                if (!finalCtx) throw new Error("Could not get final canvas context");
-                finalCtx.save();
-                finalCtx.translate(finalCanvas.width / 2, finalCanvas.height / 2);
-                finalCtx.rotate(rotation * Math.PI / 180);
-                finalCtx.scale(flipHorizontal ? -1 : 1, flipVertical ? -1 : 1);
-                finalCtx.drawImage(sourceForFinal, -finalWidth / 2, -finalHeight / 2, finalWidth, finalHeight);
-                finalCtx.restore();
-                applyPixelAdjustments(finalCtx, finalCanvas.width, finalCanvas.height, { ignoreSelection: true });
-                if (blur > 0) {
-                    const tempCanvas = document.createElement('canvas');
-                    tempCanvas.width = finalCanvas.width;
-                    tempCanvas.height = finalCanvas.height;
-                    const tempCtx = tempCanvas.getContext('2d');
-                    if(!tempCtx) throw new Error("Could not get temp canvas context for blur");
-                    tempCtx.drawImage(finalCanvas, 0, 0);
-                    finalCtx.clearRect(0,0,finalCanvas.width, finalCanvas.height);
-                    finalCtx.filter = `blur(${blur}px)`;
-                    finalCtx.drawImage(tempCanvas, 0, 0);
-                    finalCtx.filter = 'none';
-                }
-                const drawScaleX = finalCanvas.width / drawingCanvas.width;
-                const drawScaleY = finalCanvas.height / drawingCanvas.height;
-                finalCtx.save();
-                finalCtx.scale(drawScaleX, drawScaleY);
-                finalCtx.drawImage(drawingCanvas, 0, 0);
-                finalCtx.restore();
-                const newDataUrl = finalCanvas.toDataURL('image/png');
-                const resetAndApply = () => {
-                    setLuminance(0); setContrast(0); setTemp(0); setTint(0); setSaturation(0); setVibrance(0); setHue(0);
-                    setGrain(0); setClarity(0); setDehaze(0); setBlur(0); setColorAdjustments(INITIAL_COLOR_ADJUSTMENTS);
-                    setRotation(0); setFlipHorizontal(false); setFlipVertical(false); setIsInverted(false);
-                    setCropSelection(null); setActiveTool(null); deselect();
-                    if (drawingCanvasRef.current) {
-                        drawingCanvasRef.current.getContext('2d')?.clearRect(0, 0, drawingCanvasRef.current.width, drawingCanvasRef.current.height);
-                    }
-                    setInternalImageUrl(newDataUrl);
-                    const appliedState: EditorStateSnapshot = {
-                        imageUrl: newDataUrl, luminance: 0, contrast: 0, temp: 0, tint: 0, saturation: 0, vibrance: 0, hue: 0,
-                        grain: 0, clarity: 0, dehaze: 0, blur: 0, rotation: 0, flipHorizontal: false, flipVertical: false, isInverted: false,
-                        brushHardness: brushHardness, brushOpacity: brushOpacity, colorAdjustments: INITIAL_COLOR_ADJUSTMENTS, drawingCanvasDataUrl: null,
-                    };
-                    pushHistory(appliedState);
-                };
-    
-                const newImage = new Image();
-                newImage.onload = () => requestAnimationFrame(resetAndApply);
-                newImage.src = newDataUrl;
-            } catch (error) {
-                console.error("Error applying adjustments:", error);
-                alert("An error occurred while applying adjustments.");
-            } finally {
-                setIsProcessing(false);
-            }
-        }, 50);
-    }, [ internalImageUrl, sourceImageRef, previewCanvasRef, drawingCanvasRef, cropSelection, rotation, flipHorizontal, flipVertical, blur, applyPixelAdjustments, pushHistory, deselect, brushHardness, brushOpacity ]);
-
-    const handleApplyAdjustmentsToSelection = useCallback(() => {
-        if (!isSelectionActive || !selectionPath || !previewCanvasRef.current || !drawingCanvasRef.current || !sourceImageRef.current) return;
-        setIsProcessing(true);
-        setTimeout(() => {
-            try {
-                const previewCanvas = previewCanvasRef.current!;
-                const drawingCanvas = drawingCanvasRef.current!;
-                const sourceImage = sourceImageRef.current!;
-                const bakeCanvas = document.createElement('canvas');
-                bakeCanvas.width = previewCanvas.width;
-                bakeCanvas.height = previewCanvas.height;
-                const bakeCtx = bakeCanvas.getContext('2d');
-                if (!bakeCtx) throw new Error("Could not create bake canvas context");
-
-                // 1. Draw the "before" state (current image + drawings).
-                bakeCtx.save();
-                bakeCtx.translate(bakeCanvas.width / 2, bakeCanvas.height / 2);
-                bakeCtx.rotate(rotation * Math.PI / 180);
-                bakeCtx.scale(flipHorizontal ? -1 : 1, flipVertical ? -1 : 1);
-                const isSwapped = rotation === 90 || rotation === 270;
-                const drawWidth = isSwapped ? bakeCanvas.height : bakeCanvas.width;
-                const drawHeight = isSwapped ? bakeCanvas.width : bakeCanvas.height;
-                bakeCtx.drawImage(sourceImage, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
-                bakeCtx.restore();
-                bakeCtx.drawImage(drawingCanvas, 0, 0);
-
-                // 2. Create the feathered mask.
-                const maskCanvas = createFeatheredMask(selectionPath, bakeCanvas.width, bakeCanvas.height, featherAmount);
-
-                // 3. Create a temporary canvas for the "after" state (the adjusted image).
-                const adjustedLayerCanvas = document.createElement('canvas');
-                adjustedLayerCanvas.width = bakeCanvas.width;
-                adjustedLayerCanvas.height = bakeCanvas.height;
-                const adjustedLayerCtx = adjustedLayerCanvas.getContext('2d');
-                if (!adjustedLayerCtx) throw new Error("Could not create adjusted layer context");
-
-                // 4. Draw the adjusted image (from the live preview) AND drawings onto this temporary layer.
-                adjustedLayerCtx.drawImage(previewCanvas, 0, 0);
-                adjustedLayerCtx.drawImage(drawingCanvas, 0, 0);
-
-                // 5. Use the mask to "cut out" the adjusted parts.
-                adjustedLayerCtx.globalCompositeOperation = 'destination-in';
-                adjustedLayerCtx.drawImage(maskCanvas, 0, 0);
-
-                // 6. Draw the masked adjusted layer on top of the "before" state.
-                bakeCtx.drawImage(adjustedLayerCanvas, 0, 0);
-                
-                const newDataUrl = bakeCanvas.toDataURL('image/png');
-    
-                const resetAndBake = () => {
-                    setLuminance(0); setContrast(0); setTemp(0); setTint(0); setSaturation(0); setVibrance(0); setHue(0);
-                    setGrain(0); setClarity(0); setDehaze(0); setBlur(0); setColorAdjustments(INITIAL_COLOR_ADJUSTMENTS);
-                    setRotation(0); setFlipHorizontal(false); setFlipVertical(false); setIsInverted(false);
-                    if (drawingCanvasRef.current) {
-                        drawingCanvasRef.current.getContext('2d')?.clearRect(0, 0, drawingCanvasRef.current.width, drawingCanvasRef.current.height);
-                    }
-                    setInternalImageUrl(newDataUrl);
-                    const bakedState: EditorStateSnapshot = {
-                        imageUrl: newDataUrl, luminance: 0, contrast: 0, temp: 0, tint: 0, saturation: 0, vibrance: 0, hue: 0,
-                        grain: 0, clarity: 0, dehaze: 0, blur: 0, rotation: 0, flipHorizontal: false, flipVertical: false, isInverted: false,
-                        brushHardness: brushHardness, brushOpacity: brushOpacity, colorAdjustments: INITIAL_COLOR_ADJUSTMENTS, drawingCanvasDataUrl: null,
-                    };
-                    pushHistory(bakedState);
-                };
-    
-                const newImage = new Image();
-                newImage.onload = () => requestAnimationFrame(resetAndBake);
-                newImage.src = newDataUrl;
-            } catch (error) {
-                console.error("Error applying adjustments to selection:", error);
-            } finally {
-                setIsProcessing(false);
-            }
-        }, 50);
-    }, [isSelectionActive, selectionPath, previewCanvasRef, drawingCanvasRef, sourceImageRef, rotation, flipHorizontal, flipVertical, pushHistory, brushHardness, brushOpacity, featherAmount]);
-    
-    const handleToolSelect = useCallback((tool: Tool) => {
-        if (activeTool === 'pen' && tool !== 'pen') {
-            setPenPathPoints([]);
-            setCurrentPenDrag(null);
-        }
-        if (tool === 'perspective-crop') {
-            setInteractionState('placingPerspectivePoints');
-            setPerspectiveCropPoints([]); // Reset points on tool selection
-        }
-        setActiveTool(prev => (prev === tool ? null : tool));
-    }, [activeTool]);
-    const handleCancelCrop = useCallback(() => { setCropSelection(null); setActiveTool(null); }, []);
-    const handleApplyCrop = useCallback(() => {
-        if (!cropSelection || !sourceImageRef.current || !previewCanvasRef.current) return;
-        commitState();
-        const image = sourceImageRef.current; const previewCanvas = previewCanvasRef.current;
-        if (cropSelection.width < 1 || cropSelection.height < 1) { handleCancelCrop(); return; }
-        const scaleX = image.naturalWidth / previewCanvas.width; const scaleY = image.naturalHeight / previewCanvas.height;
-        const sx = cropSelection.x * scaleX; const sy = cropSelection.y * scaleY;
-        const sWidth = cropSelection.width * scaleX; const sHeight = cropSelection.height * scaleY;
-        const cropCanvas = document.createElement('canvas');
-        cropCanvas.width = sWidth; cropCanvas.height = sHeight;
-        const cropCtx = cropCanvas.getContext('2d'); if (!cropCtx) return;
-        cropCtx.drawImage(image, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
-        const newDataUrl = cropCanvas.toDataURL('image/png');
-        const postCropState: EditorStateSnapshot = { imageUrl: newDataUrl, luminance: 0, contrast: 0, temp: 0, tint: 0, saturation: 0, vibrance: 0, hue: 0, grain: 0, clarity: 0, dehaze: 0, blur: 0, rotation: 0, flipHorizontal: false, flipVertical: false, isInverted: false, brushHardness: brushHardness, brushOpacity: brushOpacity, colorAdjustments: INITIAL_COLOR_ADJUSTMENTS, drawingCanvasDataUrl: null, };
-        pushHistory(postCropState);
-        restoreState(postCropState); setCropSelection(null); setActiveTool(null);
-    }, [cropSelection, commitState, handleCancelCrop, pushHistory, restoreState, brushHardness, brushOpacity]);
-    
-    const deleteImageContentInSelection = useCallback(() => {
-        if (!selectionPath || !previewCanvasRef.current || !drawingCanvasRef.current) return;
-        setIsProcessing(true);
-        setTimeout(() => {
-            try {
-                const previewCanvas = previewCanvasRef.current!;
-                const drawingCanvas = drawingCanvasRef.current!;
-                const combinedCanvas = document.createElement('canvas');
-                combinedCanvas.width = previewCanvas.width;
-                combinedCanvas.height = previewCanvas.height;
-                const ctx = combinedCanvas.getContext('2d');
-                if (!ctx) throw new Error("Could not create combined canvas context");
-                ctx.drawImage(previewCanvas, 0, 0);
-                ctx.drawImage(drawingCanvas, 0, 0);
-
-                const maskCanvas = createFeatheredMask(selectionPath!, combinedCanvas.width, combinedCanvas.height, featherAmount);
-                
-                ctx.globalCompositeOperation = 'destination-out';
-                ctx.drawImage(maskCanvas, 0, 0);
-
-                const newDataUrl = combinedCanvas.toDataURL('image/png');
-                const bakedState: EditorStateSnapshot = { imageUrl: newDataUrl, luminance: 0, contrast: 0, temp: 0, tint: 0, saturation: 0, vibrance: 0, hue: 0, grain: 0, clarity: 0, dehaze: 0, blur: 0, rotation: 0, flipHorizontal: false, flipVertical: false, isInverted: false, brushHardness: brushHardness, brushOpacity: brushOpacity, colorAdjustments: INITIAL_COLOR_ADJUSTMENTS, drawingCanvasDataUrl: null, };
-                pushHistory(bakedState); restoreState(bakedState); deselect();
-            } catch (error) { console.error("Error deleting content:", error); alert("An error occurred while deleting the selected content."); } 
-            finally { setIsProcessing(false); }
-        }, 50);
-    }, [selectionPath, featherAmount, pushHistory, restoreState, deselect, previewCanvasRef, drawingCanvasRef, brushHardness, brushOpacity]);
-    
-    const fillSelection = useCallback(() => {
-        if (!selectionPath || !drawingCanvasRef.current) return;
-        const ctx = drawingCanvasRef.current.getContext('2d'); if (!ctx) return;
-        
-        const maskCanvas = createFeatheredMask(selectionPath, drawingCanvasRef.current.width, drawingCanvasRef.current.height, featherAmount);
-        
-        const fillCanvas = document.createElement('canvas');
-        fillCanvas.width = drawingCanvasRef.current.width;
-        fillCanvas.height = drawingCanvasRef.current.height;
-        const fillCtx = fillCanvas.getContext('2d');
-        if (fillCtx) {
-            fillCtx.fillStyle = brushColor;
-            fillCtx.fillRect(0, 0, fillCanvas.width, fillCanvas.height);
-            fillCtx.globalCompositeOperation = 'destination-in';
-            fillCtx.drawImage(maskCanvas, 0, 0);
-        }
-        
-        ctx.save();
-        ctx.globalAlpha = brushOpacity / 100;
-        ctx.drawImage(fillCanvas, 0, 0);
-        ctx.restore();
-        commitState();
-    }, [selectionPath, brushColor, brushOpacity, featherAmount, commitState]);
-
-    const invertSelection = useCallback(() => setIsSelectionInverted(prev => !prev), []);
-    
-    const handleCreateBlank = useCallback(() => {
-        const createBlankCanvasDataUrl = (width: number, height: number, color: string): string => {
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.fillStyle = color;
-                ctx.fillRect(0, 0, width, height);
-            }
-            return canvas.toDataURL('image/png');
-        };
-        const newUrl = createBlankCanvasDataUrl(2000, 2000, '#FFFFFF');
-        setupNewImage(newUrl);
-    }, [setupNewImage]);
-
-    const handleAiEdit = useCallback(async () => {
-        if (!aiEditPrompt.trim() || !internalImageUrl) return;
-        setIsLoading(true);
-
-        try {
-            let imageToSendUrl: string;
-            let promptToSend = aiEditPrompt;
-
-            const currentImageAsUrl = await getFinalImage();
-            if (!currentImageAsUrl) throw new Error("Could not get current image data.");
-
-            if (isSelectionActive && selectionPath) {
-                const tempCanvas = document.createElement('canvas');
-                const tempCtx = tempCanvas.getContext('2d');
-                const img = new Image();
-
-                await new Promise<void>((resolve, reject) => {
-                    img.onload = () => resolve();
-                    img.onerror = (err) => reject(new Error("Failed to load image for masking."));
-                    img.src = currentImageAsUrl;
-                });
-                
-                tempCanvas.width = img.naturalWidth;
-                tempCanvas.height = img.naturalHeight;
-                if (!tempCtx) throw new Error("Could not get temp canvas context");
-
-                tempCtx.drawImage(img, 0, 0);
-
-                const previewCanvas = previewCanvasRef.current;
-                if (!previewCanvas) throw new Error("Preview canvas not found");
-                const scaleX = img.naturalWidth / previewCanvas.width;
-                const scaleY = img.naturalHeight / previewCanvas.height;
-                
-                tempCtx.save();
-                tempCtx.scale(scaleX, scaleY);
-                tempCtx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-                tempCtx.fill(selectionPath);
-                tempCtx.restore();
-
-                imageToSendUrl = tempCanvas.toDataURL('image/png');
-                promptToSend = `${aiEditPrompt}. **HƯỚNG DẪN DÀNH CHO AI:** Vùng được tô màu đỏ mờ trên ảnh là khu vực duy nhất bạn được phép chỉnh sửa. Vùng màu đỏ này chỉ là một MẶT NẠ (MASK) để chỉ định khu vực, không phải là một phần của ảnh. **YÊU CẦU QUAN TRỌNG NHẤT:** Kết quả cuối cùng TUYỆT ĐỐI không được chứa bất kỳ vùng màu đỏ mờ nào.`;
-
-            } else {
-                imageToSendUrl = currentImageAsUrl;
-            }
-
-            const resultUrl = await editImageWithPrompt(imageToSendUrl, promptToSend);
-            
-            const resetAndApply = () => {
-                setLuminance(0); setContrast(0); setTemp(0); setTint(0); setSaturation(0); setVibrance(0); setHue(0);
-                setGrain(0); setClarity(0); setDehaze(0); setBlur(0); setColorAdjustments(INITIAL_COLOR_ADJUSTMENTS);
-                setRotation(0); setFlipHorizontal(false); setFlipVertical(false); setIsInverted(false);
-                setCropSelection(null); 
-                deselect();
-                if (drawingCanvasRef.current) {
-                    drawingCanvasRef.current.getContext('2d')?.clearRect(0, 0, drawingCanvasRef.current.width, drawingCanvasRef.current.height);
-                }
-                setInternalImageUrl(resultUrl);
-                const appliedState: EditorStateSnapshot = {
-                    imageUrl: resultUrl, luminance: 0, contrast: 0, temp: 0, tint: 0, saturation: 0, vibrance: 0, hue: 0,
-                    grain: 0, clarity: 0, dehaze: 0, blur: 0, rotation: 0, flipHorizontal: false, flipVertical: false, isInverted: false,
-                    brushHardness: 50, brushOpacity: 50,
-                    colorAdjustments: INITIAL_COLOR_ADJUSTMENTS, drawingCanvasDataUrl: null,
-                };
-                pushHistory(appliedState);
-                setAiEditPrompt('');
-            };
-
-            const newImage = new Image();
-            newImage.crossOrigin = "anonymous";
-            newImage.onload = () => requestAnimationFrame(resetAndApply);
-            newImage.src = resultUrl;
-
-        } catch (err) {
-            alert(`Lỗi với Chỉnh sửa AI: ${err instanceof Error ? err.message : "Đã xảy ra lỗi không xác định."}`);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [aiEditPrompt, internalImageUrl, getFinalImage, isSelectionActive, selectionPath, previewCanvasRef, pushHistory, deselect]);
-    
-    const handleSave = useCallback(async () => {
-        if (!imageToEdit) return;
-        setIsProcessing(true);
-        try {
-            const finalUrl = await getFinalImage();
-            if (finalUrl) {
-                imageToEdit.onSave(finalUrl);
-            }
-        } catch (err) {
-            console.error("Error saving image:", err);
-            alert("An error occurred while saving the image.");
-        } finally {
-            setIsProcessing(false);
-        }
-    }, [getFinalImage, imageToEdit]);
-
-    const handleRotateCanvas = useCallback(async () => {
-        if (!internalImageUrl) return;
-        setIsProcessing(true);
-        try {
-            const currentImageAsUrl = await getFinalImage();
-            if (!currentImageAsUrl) throw new Error("Could not get current image data.");
-    
-            const img = new Image();
-            img.crossOrigin = "Anonymous";
-            
-            const newDataUrl = await new Promise<string>((resolve, reject) => {
-                img.onload = () => {
-                    const rotateCanvas = document.createElement('canvas');
-                    rotateCanvas.width = img.height;
-                    rotateCanvas.height = img.width;
-                    const rotateCtx = rotateCanvas.getContext('2d');
-                    if (!rotateCtx) {
-                        reject(new Error("Could not create rotate canvas context"));
-                        return;
-                    }
-    
-                    rotateCtx.translate(rotateCanvas.width / 2, rotateCanvas.height / 2);
-                    rotateCtx.rotate(90 * Math.PI / 180);
-                    rotateCtx.drawImage(img, -img.width / 2, -img.height / 2);
-                    
-                    resolve(rotateCanvas.toDataURL('image/png'));
-                };
-                img.onerror = reject;
-                img.src = currentImageAsUrl;
-            });
-    
-            const postRotateState: EditorStateSnapshot = {
-                imageUrl: newDataUrl,
-                luminance: 0, contrast: 0, temp: 0, tint: 0, saturation: 0, vibrance: 0, hue: 0,
-                grain: 0, clarity: 0, dehaze: 0, blur: 0,
-                rotation: 0, 
-                flipHorizontal: false, flipVertical: false, isInverted: false,
-                brushHardness: brushHardness,
-                brushOpacity: brushOpacity,
-                colorAdjustments: INITIAL_COLOR_ADJUSTMENTS,
-                drawingCanvasDataUrl: null, 
-            };
-            
-            pushHistory(postRotateState);
-            restoreState(postRotateState);
-            
-            if (drawingCanvasRef.current) {
-                drawingCanvasRef.current.getContext('2d')?.clearRect(0, 0, drawingCanvasRef.current.width, drawingCanvasRef.current.height);
-            }
-    
-        } catch (err) {
-            console.error("Error during canvas rotation:", err);
-            alert("An error occurred while rotating the image.");
-        } finally {
-            setIsProcessing(false);
-        }
-    }, [internalImageUrl, getFinalImage, pushHistory, restoreState, brushHardness, brushOpacity, drawingCanvasRef]);
-
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -1575,8 +1577,6 @@ export const useImageEditorState = (
         selectionPath, aiEditPrompt,
         perspectiveCropPoints,
         hoveredPerspectiveHandleIndex,
-        handleCancelPerspectiveCrop,
-        handleApplyPerspectiveCrop,
         panX, panY, scale, zoomDisplay, canvasDimensions, isSpacePanning,
         
         // Filters & Adjustments
@@ -1593,7 +1593,7 @@ export const useImageEditorState = (
         setColorAdjustments, setActiveColorTab,
         setIsGalleryPickerOpen, setIsWebcamModalOpen, setFeatherAmount, setAiEditPrompt,
         handleActionStart, handleCanvasMouseMove, handleActionEnd,
-        handleUndo, handleRedo, commitState, resetAll, getFinalImage, handleSave,
+        commitState, resetAll, handleSave,
         handleToolSelect, handleCancelCrop, handleApplyCrop, handleAiEdit,
         handleRotateCanvas,
         handleFile,
@@ -1625,6 +1625,11 @@ export const useImageEditorState = (
         handleApplyAllAdjustments,
         handleApplyAdjustmentsToSelection,
         invertSelection, deselect, deleteImageContentInSelection, fillSelection,
+        handleCancelPerspectiveCrop,
+        handleApplyPerspectiveCrop,
+        handleUndo,
+        handleRedo,
+        getFinalImage,
     };
 };
 

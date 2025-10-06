@@ -22,6 +22,7 @@ import {
     RegenerateIcon, 
     DownloadIcon,
     CloudUploadIcon,
+    CloseIcon,
 } from './icons';
 
 type ImageStatus = 'pending' | 'done' | 'error';
@@ -37,6 +38,7 @@ interface PolaroidCardProps {
     onSwapImage?: () => void;
     onSelectFromGallery?: () => void;
     onCaptureFromWebcam?: () => void;
+    onClear?: () => void;
     isMobile?: boolean;
     placeholderType?: 'person' | 'architecture' | 'clothing' | 'magic' | 'style';
     onClick?: () => void;
@@ -80,7 +82,7 @@ const Placeholder = ({ type = 'person' }: { type?: string }) => {
 };
 
 
-const PolaroidCard: React.FC<PolaroidCardProps> = ({ mediaUrl, caption, status, error, onShake, onDownload, onEdit, onSwapImage, onSelectFromGallery, onCaptureFromWebcam, isMobile, placeholderType = 'person', onClick, isDraggingOver, onDragOver, onDragLeave, onDrop }) => {
+const PolaroidCard: React.FC<PolaroidCardProps> = ({ mediaUrl, caption, status, error, onShake, onDownload, onEdit, onSwapImage, onSelectFromGallery, onCaptureFromWebcam, onClear, isMobile, placeholderType = 'person', onClick, isDraggingOver, onDragOver, onDragLeave, onDrop }) => {
     const { t } = useAppControls();
     const hasMedia = status === 'done' && mediaUrl;
     const isVideo = hasMedia && mediaUrl!.startsWith('blob:');
@@ -166,6 +168,18 @@ const PolaroidCard: React.FC<PolaroidCardProps> = ({ mediaUrl, caption, status, 
                             aria-label={`${t('common_swapImage')} ${caption}`}
                         >
                             <SwapIcon className="h-5 w-5" strokeWidth={2} />
+                        </button>
+                    )}
+                    {hasMedia && onClear && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onClear();
+                            }}
+                            className="p-2 bg-black/50 rounded-full text-white hover:bg-red-600/80 focus:outline-none focus:ring-2 focus:ring-red-400"
+                            aria-label={`Xóa ${caption}`}
+                        >
+                            <CloseIcon className="h-5 w-5" />
                         </button>
                     )}
                     {onSelectFromGallery && (
